@@ -1,0 +1,27 @@
+{
+  "name": "transparency-radar",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=9"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter=./packages/api --filter=./packages/scrapers dev",
+    "build": "pnpm -r --if-present build",
+    "lint": "biome check .",
+    "format": "biome format --write .",
+    "test": "vitest run",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "db:up": "docker compose up -d postgres",
+    "db:down": "docker compose down",
+    "db:migrate": "pnpm --filter=./packages/db migrate",
+    "db:studio": "pnpm --filter=./packages/db studio"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^1.9.4",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}
