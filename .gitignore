@@ -34,8 +34,6 @@ coverage/
 .vscode/*
 !.vscode/extensions.json
 
-# Drizzle
-drizzle/
 
 # Uploads (local storage)
 uploads/
