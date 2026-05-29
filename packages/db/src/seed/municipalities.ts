@@ -16,10 +16,7 @@ async function seed() {
     name: DISPLAY_NAMES[slug],
   }));
 
-  await db
-    .insert(municipalities)
-    .values(rows)
-    .onConflictDoNothing({ target: municipalities.slug });
+  await db.insert(municipalities).values(rows).onConflictDoNothing({ target: municipalities.slug });
 
   console.log(`Seeded ${rows.length.toString()} municipalities.`);
   process.exit(0);

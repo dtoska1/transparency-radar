@@ -110,12 +110,8 @@
           "name": "document_checks_document_id_documents_id_fk",
           "tableFrom": "document_checks",
           "tableTo": "documents",
-          "columnsFrom": [
-            "document_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["document_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -169,12 +165,8 @@
           "name": "document_versions_document_id_documents_id_fk",
           "tableFrom": "document_versions",
           "tableTo": "documents",
-          "columnsFrom": [
-            "document_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["document_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -254,9 +246,7 @@
         "documents_sha256_unique": {
           "name": "documents_sha256_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "sha256"
-          ]
+          "columns": ["sha256"]
         }
       },
       "policies": {},
@@ -293,12 +283,8 @@
           "name": "konsultim_documents_konsultim_id_konsultime_id_fk",
           "tableFrom": "konsultim_documents",
           "tableTo": "konsultime",
-          "columnsFrom": [
-            "konsultim_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["konsultim_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -306,12 +292,8 @@
           "name": "konsultim_documents_document_version_id_document_versions_id_fk",
           "tableFrom": "konsultim_documents",
           "tableTo": "document_versions",
-          "columnsFrom": [
-            "document_version_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["document_version_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -319,10 +301,7 @@
       "compositePrimaryKeys": {
         "konsultim_documents_konsultim_id_document_version_id_pk": {
           "name": "konsultim_documents_konsultim_id_document_version_id_pk",
-          "columns": [
-            "konsultim_id",
-            "document_version_id"
-          ]
+          "columns": ["konsultim_id", "document_version_id"]
         }
       },
       "uniqueConstraints": {},
@@ -463,12 +442,8 @@
           "name": "konsultime_municipality_id_municipalities_id_fk",
           "tableFrom": "konsultime",
           "tableTo": "municipalities",
-          "columnsFrom": [
-            "municipality_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["municipality_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -476,12 +451,8 @@
           "name": "konsultime_source_id_sources_id_fk",
           "tableFrom": "konsultime",
           "tableTo": "sources",
-          "columnsFrom": [
-            "source_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -491,9 +462,7 @@
         "konsultime_dedup_key_unique": {
           "name": "konsultime_dedup_key_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "dedup_key"
-          ]
+          "columns": ["dedup_key"]
         }
       },
       "policies": {},
@@ -538,9 +507,7 @@
         "municipalities_slug_unique": {
           "name": "municipalities_slug_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "slug"
-          ]
+          "columns": ["slug"]
         }
       },
       "policies": {},
@@ -577,12 +544,8 @@
           "name": "prokurim_documents_prokurim_id_prokurime_id_fk",
           "tableFrom": "prokurim_documents",
           "tableTo": "prokurime",
-          "columnsFrom": [
-            "prokurim_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["prokurim_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -590,12 +553,8 @@
           "name": "prokurim_documents_document_version_id_document_versions_id_fk",
           "tableFrom": "prokurim_documents",
           "tableTo": "document_versions",
-          "columnsFrom": [
-            "document_version_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["document_version_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -603,10 +562,7 @@
       "compositePrimaryKeys": {
         "prokurim_documents_prokurim_id_document_version_id_pk": {
           "name": "prokurim_documents_prokurim_id_document_version_id_pk",
-          "columns": [
-            "prokurim_id",
-            "document_version_id"
-          ]
+          "columns": ["prokurim_id", "document_version_id"]
         }
       },
       "uniqueConstraints": {},
@@ -745,12 +701,8 @@
           "name": "prokurime_municipality_id_municipalities_id_fk",
           "tableFrom": "prokurime",
           "tableTo": "municipalities",
-          "columnsFrom": [
-            "municipality_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["municipality_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -758,12 +710,8 @@
           "name": "prokurime_source_id_sources_id_fk",
           "tableFrom": "prokurime",
           "tableTo": "sources",
-          "columnsFrom": [
-            "source_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -773,9 +721,7 @@
         "prokurime_dedup_key_unique": {
           "name": "prokurime_dedup_key_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "dedup_key"
-          ]
+          "columns": ["dedup_key"]
         }
       },
       "policies": {},
@@ -858,12 +804,8 @@
           "name": "sources_municipality_id_municipalities_id_fk",
           "tableFrom": "sources",
           "tableTo": "municipalities",
-          "columnsFrom": [
-            "municipality_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["municipality_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -904,12 +846,8 @@
           "name": "vendim_documents_vendim_id_vendime_id_fk",
           "tableFrom": "vendim_documents",
           "tableTo": "vendime",
-          "columnsFrom": [
-            "vendim_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["vendim_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -917,12 +855,8 @@
           "name": "vendim_documents_document_version_id_document_versions_id_fk",
           "tableFrom": "vendim_documents",
           "tableTo": "document_versions",
-          "columnsFrom": [
-            "document_version_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["document_version_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -930,10 +864,7 @@
       "compositePrimaryKeys": {
         "vendim_documents_vendim_id_document_version_id_pk": {
           "name": "vendim_documents_vendim_id_document_version_id_pk",
-          "columns": [
-            "vendim_id",
-            "document_version_id"
-          ]
+          "columns": ["vendim_id", "document_version_id"]
         }
       },
       "uniqueConstraints": {},
@@ -1072,12 +1003,8 @@
           "name": "vendime_municipality_id_municipalities_id_fk",
           "tableFrom": "vendime",
           "tableTo": "municipalities",
-          "columnsFrom": [
-            "municipality_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["municipality_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         },
@@ -1085,12 +1012,8 @@
           "name": "vendime_source_id_sources_id_fk",
           "tableFrom": "vendime",
           "tableTo": "sources",
-          "columnsFrom": [
-            "source_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_id"],
+          "columnsTo": ["id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -1100,9 +1023,7 @@
         "vendime_dedup_key_unique": {
           "name": "vendime_dedup_key_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "dedup_key"
-          ]
+          "columns": ["dedup_key"]
         }
       },
       "policies": {},
@@ -1114,29 +1035,17 @@
     "public.konsultime_kind": {
       "name": "konsultime_kind",
       "schema": "public",
-      "values": [
-        "consultation_notice",
-        "draft_act",
-        "hearing"
-      ]
+      "values": ["consultation_notice", "draft_act", "hearing"]
     },
     "public.review_status": {
       "name": "review_status",
       "schema": "public",
-      "values": [
-        "pending",
-        "approved",
-        "rejected"
-      ]
+      "values": ["pending", "approved", "rejected"]
     },
     "public.vertical": {
       "name": "vertical",
       "schema": "public",
-      "values": [
-        "vendime",
-        "konsultime",
-        "prokurime"
-      ]
+      "values": ["vendime", "konsultime", "prokurime"]
     }
   },
   "schemas": {},
