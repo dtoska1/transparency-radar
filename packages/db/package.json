@@ -12,6 +12,7 @@
     "generate": "drizzle-kit generate",
     "migrate": "drizzle-kit migrate",
     "seed": "tsx src/seed/municipalities.ts",
+    "seed:sources": "tsx src/seed/sources.ts",
     "studio": "drizzle-kit studio"
   },
   "dependencies": {
