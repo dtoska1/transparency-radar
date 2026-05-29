@@ -1,4 +1,4 @@
-import { type MunicipalitySlug } from '@tra/shared';
+import type { MunicipalitySlug } from '@tra/shared';
 import { db } from '../connection.js';
 import { municipalities, sources } from '../schema/index.js';
 
@@ -53,7 +53,8 @@ const SOURCE_DEFINITIONS: SourceDef[] = [
     vertical: 'konsultime',
     source_origin: 'bashkiashkoder.gov.al',
     source_page_url: 'https://bashkiashkoder.gov.al',
-    notes: 'Listing URL TBC — update source_page_url once confirmed; konsultimivendor.al is external/unofficial',
+    notes:
+      'Listing URL TBC — update source_page_url once confirmed; konsultimivendor.al is external/unofficial',
   },
   {
     slug: 'shkoder',
@@ -118,7 +119,8 @@ const SOURCE_DEFINITIONS: SourceDef[] = [
     vertical: 'vendime',
     source_origin: 'bashkiapogradec.gov.al',
     source_page_url: 'https://bashkiapogradec.gov.al/publikime-kategori/vendime-te-keshillit-2',
-    notes: 'Per-meeting PDF bundles — decision numbers inside PDFs, pdf-parse required for dedup key',
+    notes:
+      'Per-meeting PDF bundles — decision numbers inside PDFs, pdf-parse required for dedup key',
   },
   {
     slug: 'pogradec',
@@ -126,7 +128,8 @@ const SOURCE_DEFINITIONS: SourceDef[] = [
     source_origin: 'bashkiapogradec.gov.al',
     source_page_url:
       'https://bashkiapogradec.gov.al/publikime-kategori/njoftime-te-keshillit-bashkiak-12',
-    notes: 'Council notices listing — filter by keyword "konsultim publik"; exclude dead Bashkitë e Forta link',
+    notes:
+      'Council notices listing — filter by keyword "konsultim publik"; exclude dead Bashkitë e Forta link',
   },
   {
     slug: 'pogradec',
