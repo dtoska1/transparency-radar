@@ -7,7 +7,8 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc -b",
     "typecheck": "tsc --noEmit",
-    "run:pogradec:vendime": "tsx src/pogradec/run.ts"
+    "run:pogradec:vendime": "tsx src/pogradec/run.ts",
+    "run:shkoder:vendime": "tsx src/shkoder/run.ts"
   },
   "dependencies": {
     "@tra/db": "workspace:*",
