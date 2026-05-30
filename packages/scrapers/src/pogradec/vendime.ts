@@ -91,7 +91,8 @@ async function stampDocument(
 
 function numberFromFilename(pdfUrl: string): string | null {
   const filename = new URL(pdfUrl).pathname.split('/').pop() ?? '';
-  return filename.match(/(?:vkb|vendim|vend)[-_]?nr[-_]?(\d+)/i)?.[1] ?? null;
+  // longest alternation first; optional nr|ne marker; captures decision number not date
+  return filename.match(/(?:vkbr?|vendimi?|vend|ven)[-_ ]?(?:n[re]\.?[-_ ]?)?(\d+)/i)?.[1] ?? null;
 }
 
 // ── Year validation ───────────────────────────────────────────────────────────
@@ -109,7 +110,7 @@ async function extractTitleFromPdf(
   try {
     const { text } = await pdfParse(buffer);
     const firstLine = text.trim().split('\n')[0]?.trim() ?? '';
-    const numMatch = text.match(/VKB\s+nr\.?\s*(\d+)/i);
+    const numMatch = text.match(/(?:VKB|Vendim|Vend)\s+nr\.?\s*(\d+)/i);
     return {
       title: firstLine.length > 5 ? firstLine : null,
       number: numMatch?.[1] ?? null,
@@ -515,7 +516,7 @@ export class PogradecVendimeScraper extends BaseScraper {
       .returning({ id: vendime.id });
 
     if (!inserted) {
-      this.logger.debug({ dedupKey }, 'Vendim already exists — skipping');
+      this.logger.warn({ dedupKey, pdfUrl: meeting.pdfUrl }, 'dedup conflict — skipped');
       return { seen: 1, created: 0 };
     }
 
