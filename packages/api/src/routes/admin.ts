@@ -5,6 +5,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import type express from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
+import { handleBulkApprove } from './adminBulkApprove.js';
 import { handleAdminCreate, upload } from './adminCreate.js';
 
 const VerticalSchema = z.enum(VERTICALS);
@@ -24,6 +25,10 @@ const RejectBodySchema = z.object({
 export const adminRouter: express.Router = Router();
 
 adminRouter.post('/:vertical', upload.single('file'), handleAdminCreate);
+
+// Must be registered before /:vertical/:id routes — literal segment 'bulk-approve'
+// won't collide (different path depth), but explicit ordering makes intent clear.
+adminRouter.post('/:vertical/bulk-approve', handleBulkApprove);
 
 adminRouter.get('/pending', async (req, res) => {
   const parse = PendingQuerySchema.safeParse(req.query);
