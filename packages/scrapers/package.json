@@ -6,15 +6,23 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc -b",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "run:pogradec:vendime": "tsx src/pogradec/run.ts"
   },
   "dependencies": {
+    "@tra/db": "workspace:*",
     "@tra/shared": "workspace:*",
+    "cheerio": "^1.0.0",
+    "drizzle-orm": "^0.38.3",
     "inngest": "^3.29.0",
-    "pino": "^9.6.0"
+    "pdf-parse": "^1.1.1",
+    "pino": "^9.6.0",
+    "tesseract.js": "^5.1.0",
+    "undici": "^6.21.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.7",
+    "@types/pdf-parse": "^1.1.4",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",
     "vitest": "^2.1.8"
