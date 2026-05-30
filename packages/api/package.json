@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@sentry/node": "^8.47.0",
+    "@tra/db": "workspace:*",
+    "drizzle-orm": "^0.38.3",
     "@tra/shared": "workspace:*",
     "cors": "^2.8.5",
     "express": "^5.0.1",

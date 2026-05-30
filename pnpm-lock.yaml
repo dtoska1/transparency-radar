@@ -25,12 +25,18 @@ importers:
       '@sentry/node':
         specifier: ^8.47.0
         version: 8.55.2
+      '@tra/db':
+        specifier: workspace:*
+        version: link:../db
       '@tra/shared':
         specifier: workspace:*
         version: link:../shared
       cors:
         specifier: ^2.8.5
         version: 2.8.6
+      drizzle-orm:
+        specifier: ^0.38.3
+        version: 0.38.4(@opentelemetry/api@1.9.1)(@types/pg@8.15.6)(postgres@3.4.9)
       express:
         specifier: ^5.0.1
         version: 5.2.1
