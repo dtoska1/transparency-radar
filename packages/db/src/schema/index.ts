@@ -254,3 +254,24 @@ export const audit_log = pgTable('audit_log', {
   payload: jsonb('payload'),
   created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ── Scrape run log ────────────────────────────────────────────────────────────
+
+export const scrape_runs = pgTable('scrape_runs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  source_id: uuid('source_id')
+    .notNull()
+    .references(() => sources.id),
+  municipality_id: uuid('municipality_id')
+    .notNull()
+    .references(() => municipalities.id),
+  vertical: verticalEnum('vertical').notNull(),
+  started_at: timestamp('started_at', { withTimezone: true }).notNull(),
+  finished_at: timestamp('finished_at', { withTimezone: true }),
+  status: text('status').notNull(),
+  items_seen: integer('items_seen').notNull().default(0),
+  items_new: integer('items_new').notNull().default(0),
+  items_updated: integer('items_updated').notNull().default(0),
+  error_message: text('error_message'),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
