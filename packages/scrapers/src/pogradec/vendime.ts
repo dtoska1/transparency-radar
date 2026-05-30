@@ -91,7 +91,14 @@ async function stampDocument(
 
 function numberFromFilename(pdfUrl: string): string | null {
   const filename = new URL(pdfUrl).pathname.split('/').pop() ?? '';
-  return filename.match(/vkb[-_]?nr[-_]?(\d+)/i)?.[1] ?? null;
+  return filename.match(/(?:vkb|vendim|vend)[-_]?nr[-_]?(\d+)/i)?.[1] ?? null;
+}
+
+// ── Year validation ───────────────────────────────────────────────────────────
+
+function isValidYear(isoDate: string): boolean {
+  const year = Number.parseInt(isoDate.slice(0, 4), 10);
+  return year >= 2018 && year <= 2027;
 }
 
 // ── PDF enrichment (best-effort, non-fatal) ───────────────────────────────────
@@ -176,6 +183,7 @@ export class PogradecVendimeScraper extends BaseScraper {
       for (const entry of entries) {
         await this.delay(1000 + Math.random() * 500);
         const detail = await this.fetchDetailPage(entry.detailUrl);
+        if (!detail) continue;
         const result = await this.processDetailPage(detail, sourceId, municipalityId);
         totalSeen += result.seen;
         totalNew += result.created;
@@ -254,27 +262,24 @@ export class PogradecVendimeScraper extends BaseScraper {
     return entries
       .filter(
         (e): e is DetailEntry & { dateFromSlug: string } =>
-          e.dateFromSlug !== null && e.dateFromSlug >= MANDATE_START,
+          e.dateFromSlug !== null && isValidYear(e.dateFromSlug) && e.dateFromSlug >= MANDATE_START,
       )
       .sort((a, b) => b.dateFromSlug.localeCompare(a.dateFromSlug))
       .slice(0, this.firstRunLimit);
   }
 
-  private async fetchDetailPage(detailUrl: string): Promise<DetailPage> {
+  private async fetchDetailPage(detailUrl: string): Promise<DetailPage | null> {
     const res = await fetch(detailUrl, { headers: HTTP_HEADERS });
     if (!res.ok) throw new Error(`Detail page fetch failed (${res.status}): ${detailUrl}`);
     const html = await res.text();
 
     const $ = cheerio.load(html);
 
-    // Meeting date: H1 contains "Vendimet e Mbledhjes së datës DD.MM.YYYY"
-    const dateFromH1 = parseMeetingDate($('h1').first().text());
-    // Fallback: URL slug contains …-dates-30-03-2026-…
-    const dateFromSlug = parseMeetingDate(detailUrl);
-    const date = dateFromH1 ?? dateFromSlug;
-    if (!date) throw new Error(`Could not parse meeting date from detail page: ${detailUrl}`);
+    // Attempt 1: H1 text ("Vendimet e Mbledhjes së datës DD.MM.YYYY")
+    const h1Candidate = parseMeetingDate($('h1').first().text());
+    const dateFromH1 = h1Candidate && isValidYear(h1Candidate) ? h1Candidate : null;
 
-    // Collect PDF URLs from the decision table
+    // Collect PDF URLs (needed for attempt 2 — must happen before date resolution)
     const pdfUrls: string[] = [];
     $('a[href$=".pdf"]').each((_i, el) => {
       const href = $(el).attr('href') ?? '';
@@ -290,6 +295,30 @@ export class PogradecVendimeScraper extends BaseScraper {
         this.logger.warn({ href }, 'Invalid PDF href — skipping');
       }
     });
+
+    // Attempt 2: date token in first PDF filename (reliable even when slug is corrupt)
+    let dateFromPdf: string | null = null;
+    for (const pdfUrl of pdfUrls) {
+      const filename = new URL(pdfUrl).pathname.split('/').pop() ?? '';
+      const m = filename.match(/(\d{2})[-.](\d{2})[-.](20\d{2})/);
+      if (m) {
+        const candidate = parseMeetingDate(`${m[1]}.${m[2]}.${m[3]}`);
+        if (candidate && isValidYear(candidate)) {
+          dateFromPdf = candidate;
+          break;
+        }
+      }
+    }
+
+    // Attempt 3: URL slug
+    const slugCandidate = parseMeetingDate(detailUrl);
+    const dateFromSlug = slugCandidate && isValidYear(slugCandidate) ? slugCandidate : null;
+
+    const date = dateFromH1 ?? dateFromPdf ?? dateFromSlug;
+    if (!date) {
+      this.logger.warn({ detailUrl }, 'no valid meeting date — skipping');
+      return null;
+    }
 
     if (pdfUrls.length === 0) {
       this.logger.error(
