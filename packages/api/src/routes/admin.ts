@@ -5,6 +5,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import type express from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
+import { handleAdminCreate, upload } from './adminCreate.js';
 
 const VerticalSchema = z.enum(VERTICALS);
 const UUIDSchema = z.string().uuid();
@@ -21,6 +22,8 @@ const RejectBodySchema = z.object({
 });
 
 export const adminRouter: express.Router = Router();
+
+adminRouter.post('/:vertical', upload.single('file'), handleAdminCreate);
 
 adminRouter.get('/pending', async (req, res) => {
   const parse = PendingQuerySchema.safeParse(req.query);

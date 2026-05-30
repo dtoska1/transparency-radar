@@ -3,6 +3,7 @@ import express, { type Express, type NextFunction, type Request, type Response }
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { serve } from 'inngest/express';
+import multer from 'multer';
 import { pinoHttp } from 'pino-http';
 import { ZodError } from 'zod';
 import { inngest } from './inngest.js';
@@ -70,6 +71,14 @@ export function createApp(): Express {
 
   // Central error handler — no stack traces to client
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+    if (err instanceof multer.MulterError) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        res.status(413).json({ error: 'File too large (max 50 MB)' });
+        return;
+      }
+      res.status(400).json({ error: err.message });
+      return;
+    }
     if (err instanceof ZodError) {
       res.status(400).json({ error: 'Validation error', details: err.flatten() });
       return;
