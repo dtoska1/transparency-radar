@@ -59,19 +59,6 @@ function parseMeetingDate(raw: string): string | null {
   return isoDate;
 }
 
-// ── OCR fallback ──────────────────────────────────────────────────────────────
-
-async function ocrBuffer(buffer: Buffer): Promise<string> {
-  const { createWorker } = await import('tesseract.js');
-  const worker = await createWorker('sqi');
-  try {
-    const { data } = await worker.recognize(buffer);
-    return data.text;
-  } finally {
-    await worker.terminate();
-  }
-}
-
 // ── FreeTSA (async, fire-and-forget) ─────────────────────────────────────────
 
 async function stampDocument(
@@ -100,10 +87,45 @@ async function stampDocument(
   }
 }
 
+// ── Number from PDF filename ──────────────────────────────────────────────────
+
+function numberFromFilename(pdfUrl: string): string | null {
+  const filename = new URL(pdfUrl).pathname.split('/').pop() ?? '';
+  return filename.match(/vkb[-_]?nr[-_]?(\d+)/i)?.[1] ?? null;
+}
+
+// ── PDF enrichment (best-effort, non-fatal) ───────────────────────────────────
+
+async function extractTitleFromPdf(
+  buffer: Buffer,
+): Promise<{ title: string | null; number: string | null }> {
+  try {
+    const { text } = await pdfParse(buffer);
+    const firstLine = text.trim().split('\n')[0]?.trim() ?? '';
+    const numMatch = text.match(/VKB\s+nr\.?\s*(\d+)/i);
+    return {
+      title: firstLine.length > 5 ? firstLine : null,
+      number: numMatch?.[1] ?? null,
+    };
+  } catch {
+    return { title: null, number: null };
+  }
+}
+
 // ── Scraper ───────────────────────────────────────────────────────────────────
 
+interface DetailEntry {
+  detailUrl: string;
+  dateFromSlug: string | null;
+}
+
+interface DetailPage {
+  date: string;
+  pdfUrls: string[];
+  detailUrl: string;
+}
+
 interface Meeting {
-  title: string;
   date: string;
   pdfUrl: string;
 }
@@ -125,7 +147,7 @@ export class PogradecVendimeScraper extends BaseScraper {
   constructor(opts: { firstRunLimit?: number } = {}) {
     super('pogradec', 'vendime');
     this.storage = new LocalDiskAdapter(process.env.STORAGE_LOCAL_PATH ?? './uploads');
-    this.firstRunLimit = opts.firstRunLimit ?? 3;
+    this.firstRunLimit = opts.firstRunLimit ?? 1;
   }
 
   async run(): Promise<void> {
@@ -148,14 +170,13 @@ export class PogradecVendimeScraper extends BaseScraper {
     let totalNew = 0;
 
     try {
-      const meetings = await this.fetchListing();
-      const kept = meetings.filter((m) => m.date >= MANDATE_START).slice(0, this.firstRunLimit);
+      const entries = await this.fetchListingEntries();
+      this.logger.info({ kept: entries.length }, 'Listing fetched');
 
-      this.logger.info({ total: meetings.length, kept: kept.length }, 'Listing fetched');
-
-      for (const meeting of kept) {
+      for (const entry of entries) {
         await this.delay(1000 + Math.random() * 500);
-        const result = await this.processMeeting(meeting, sourceId, municipalityId);
+        const detail = await this.fetchDetailPage(entry.detailUrl);
+        const result = await this.processDetailPage(detail, sourceId, municipalityId);
         totalSeen += result.seen;
         totalNew += result.created;
       }
@@ -201,110 +222,116 @@ export class PogradecVendimeScraper extends BaseScraper {
     return { sourceId: found.sourceId, municipalityId: found.municipalityId };
   }
 
-  private async fetchListing(): Promise<Meeting[]> {
+  private async fetchListingEntries(): Promise<DetailEntry[]> {
     const res = await fetch(LISTING_URL, { headers: HTTP_HEADERS });
     if (!res.ok) throw new Error(`Listing fetch failed: ${res.status}`);
     const html = await res.text();
 
     const $ = cheerio.load(html);
-    const meetings: Meeting[] = [];
+    const entries: DetailEntry[] = [];
+    const seen = new Set<string>();
 
-    // Try multiple selector strategies since CMS is unknown
-    // Strategy 1: common list/article patterns
-    const candidates = $('article, .entry, .post, li.item, .publication-item, .list-item');
+    $('a[href*="/publikime/vendime-te-keshillit-2/"]').each((_i, el) => {
+      const href = $(el).attr('href') ?? '';
+      if (!href || href.includes('/publikime-kategori/')) return;
+      const detailUrl = href.startsWith('http') ? href : new URL(href, LISTING_URL).toString();
+      if (seen.has(detailUrl)) return;
+      seen.add(detailUrl);
 
-    if (candidates.length > 0) {
-      candidates.each((_i, el) => {
-        const titleEl = $(el).find('a, h2, h3, .title').first();
-        const title = titleEl.text().trim();
-        const pdfLink = $(el)
-          .find(
-            'a[href$=".pdf"], a:contains("Shkarko"), a:contains("shkarko"), a:contains("dokumentin")',
-          )
-          .first();
-        const href = pdfLink.attr('href') ?? titleEl.attr('href') ?? '';
+      // Date from URL slug: …-dates-30-03-2026-856/
+      const dateFromSlug = parseMeetingDate(detailUrl);
+      entries.push({ detailUrl, dateFromSlug });
+    });
 
-        if (!href) return;
-
-        const dateRaw = title.match(/\d{1,2}[.\-/]\d{1,2}[.\-/]\d{2,5}/)?.[0] ?? '';
-        const date = parseMeetingDate(dateRaw);
-        if (!date) {
-          this.logger.warn({ title, dateRaw }, 'Could not parse meeting date — skipping');
-          return;
-        }
-
-        const pdfUrl = href.startsWith('http') ? href : new URL(href, LISTING_URL).toString();
-        meetings.push({ title, date, pdfUrl });
-      });
-    }
-
-    // Strategy 2: if nothing found, walk all PDF links on the page
-    if (meetings.length === 0) {
-      this.logger.warn('No meetings from strategy 1 — falling back to all PDF links');
-      $('a[href$=".pdf"]').each((_i, el) => {
-        const href = $(el).attr('href') ?? '';
-        const text = $(el).text().trim() || $(el).closest('*').text().trim();
-        const dateRaw = text.match(/\d{1,2}[.\-/]\d{1,2}[.\-/]\d{2,5}/)?.[0] ?? '';
-        const date = parseMeetingDate(dateRaw);
-        if (!date) {
-          this.logger.warn(
-            { text, href },
-            'Fallback: could not parse date for PDF link — skipping',
-          );
-          return;
-        }
-        const pdfUrl = href.startsWith('http') ? href : new URL(href, LISTING_URL).toString();
-        meetings.push({ title: text, date, pdfUrl });
-      });
-    }
-
-    if (meetings.length === 0) {
+    if (entries.length === 0) {
       this.logger.error(
         { htmlSnippet: html.slice(0, 2000) },
-        'items_seen=0: selectors matched nothing — inspect htmlSnippet and update selectors',
+        'items_seen=0: no detail-page links found — inspect htmlSnippet and update selector',
+      );
+      return [];
+    }
+
+    return entries
+      .filter(
+        (e): e is DetailEntry & { dateFromSlug: string } =>
+          e.dateFromSlug !== null && e.dateFromSlug >= MANDATE_START,
+      )
+      .sort((a, b) => b.dateFromSlug.localeCompare(a.dateFromSlug))
+      .slice(0, this.firstRunLimit);
+  }
+
+  private async fetchDetailPage(detailUrl: string): Promise<DetailPage> {
+    const res = await fetch(detailUrl, { headers: HTTP_HEADERS });
+    if (!res.ok) throw new Error(`Detail page fetch failed (${res.status}): ${detailUrl}`);
+    const html = await res.text();
+
+    const $ = cheerio.load(html);
+
+    // Meeting date: H1 contains "Vendimet e Mbledhjes së datës DD.MM.YYYY"
+    const dateFromH1 = parseMeetingDate($('h1').first().text());
+    // Fallback: URL slug contains …-dates-30-03-2026-…
+    const dateFromSlug = parseMeetingDate(detailUrl);
+    const date = dateFromH1 ?? dateFromSlug;
+    if (!date) throw new Error(`Could not parse meeting date from detail page: ${detailUrl}`);
+
+    // Collect PDF URLs from the decision table
+    const pdfUrls: string[] = [];
+    $('a[href$=".pdf"]').each((_i, el) => {
+      const href = $(el).attr('href') ?? '';
+      if (!href) return;
+      const pdfUrl = href.startsWith('http') ? href : new URL(href, detailUrl).toString();
+      try {
+        if (new URL(pdfUrl).hostname === ALLOWED_HOST) {
+          pdfUrls.push(pdfUrl);
+        } else {
+          this.logger.warn({ pdfUrl }, 'Off-domain PDF — skipping');
+        }
+      } catch {
+        this.logger.warn({ href }, 'Invalid PDF href — skipping');
+      }
+    });
+
+    if (pdfUrls.length === 0) {
+      this.logger.error(
+        { htmlSnippet: html.slice(0, 2000), detailUrl },
+        'No PDFs on detail page — inspect htmlSnippet and update selector',
       );
     }
 
-    // Deduplicate by pdfUrl and sort newest first
-    const seen = new Set<string>();
-    const deduped = meetings.filter((m) => {
-      if (seen.has(m.pdfUrl)) return false;
-      seen.add(m.pdfUrl);
-      return true;
-    });
-    deduped.sort((a, b) => b.date.localeCompare(a.date));
-    return deduped;
+    this.logger.info({ date, pdfCount: pdfUrls.length, detailUrl }, 'Detail page fetched');
+    return { date, pdfUrls, detailUrl };
   }
 
-  private async processMeeting(
-    meeting: Meeting,
+  private async processDetailPage(
+    detail: DetailPage,
     sourceId: string,
     municipalityId: string,
   ): Promise<ProcessResult> {
-    this.logger.info({ date: meeting.date, url: meeting.pdfUrl }, 'Processing meeting');
+    let seen = 0;
+    let created = 0;
+    for (const pdfUrl of detail.pdfUrls) {
+      await this.delay(500 + Math.random() * 500);
+      const result = await this.processPdf(pdfUrl, detail.date, sourceId, municipalityId);
+      seen += result.seen;
+      created += result.created;
+    }
+    return { seen, created };
+  }
 
-    // Host validation
-    let pdfUrlParsed: URL;
-    try {
-      pdfUrlParsed = new URL(meeting.pdfUrl);
-    } catch {
-      this.logger.warn({ url: meeting.pdfUrl }, 'Invalid PDF URL — skipping');
-      return { seen: 0, created: 0 };
-    }
-    if (pdfUrlParsed.hostname !== ALLOWED_HOST) {
-      this.logger.warn({ host: pdfUrlParsed.hostname }, 'Off-domain PDF URL — skipping');
-      return { seen: 0, created: 0 };
-    }
+  private async processPdf(
+    pdfUrl: string,
+    meetingDate: string,
+    sourceId: string,
+    municipalityId: string,
+  ): Promise<ProcessResult> {
+    this.logger.debug({ pdfUrl }, 'Processing PDF');
 
     // Download
-    const pdfRes = await fetch(meeting.pdfUrl, {
+    const pdfRes = await fetch(pdfUrl, {
       headers: { ...HTTP_HEADERS, Accept: 'application/pdf' },
     });
     if (!pdfRes.ok) {
-      this.logger.warn(
-        { url: meeting.pdfUrl, status: pdfRes.status },
-        'PDF download failed — skipping',
-      );
+      this.logger.warn({ url: pdfUrl, status: pdfRes.status }, 'PDF download failed — skipping');
       return { seen: 0, created: 0 };
     }
     const buffer = Buffer.from(await pdfRes.arrayBuffer());
@@ -316,49 +343,46 @@ export class PogradecVendimeScraper extends BaseScraper {
     const storageKey = `pogradec/vendime/${sha256}.pdf`;
     await this.storage.upload(storageKey, buffer, 'application/pdf');
 
-    // Document dedup
-    const isNewDoc = await this.upsertDocument(sha256, storageKey, buffer.length);
-    if (isNewDoc.isNew) {
-      void stampDocument(isNewDoc.id, sha256, this.logger);
+    // Document dedup + version
+    const doc = await this.upsertDocument(sha256, storageKey, buffer.length);
+    if (doc.isNew) {
+      void stampDocument(doc.id, sha256, this.logger);
+    }
+    const docVersion = await this.upsertDocumentVersion(doc.id, pdfUrl);
+
+    // Number: filename first, pdf-parse fallback
+    const numFromFile = numberFromFilename(pdfUrl);
+    let number: string;
+    let titleFromPdf: string | null = null;
+
+    if (numFromFile) {
+      number = numFromFile;
+      // Best-effort title enrichment from PDF text (non-fatal)
+      const enriched = await extractTitleFromPdf(buffer);
+      titleFromPdf = enriched.title;
+    } else {
+      const enriched = await extractTitleFromPdf(buffer);
+      titleFromPdf = enriched.title;
+      if (enriched.number) {
+        number = enriched.number;
+      } else {
+        number = `PLACEHOLDER-${sha256.slice(0, 8)}`;
+        this.logger.warn({ pdfUrl }, 'No decision number from filename or PDF — using placeholder');
+      }
     }
 
-    // Document version
-    const docVersion = await this.upsertDocumentVersion(isNewDoc.id, meeting.pdfUrl);
+    const titleOverride = number.startsWith('PLACEHOLDER-')
+      ? `[PLACEHOLDER] Vendime Keshillit – ${meetingDate} (PDF kërkon rishikim manual)`
+      : titleFromPdf;
 
-    // Extract decisions
-    const decisions = await this.extractDecisions(buffer);
-
-    if (decisions.length === 0) {
-      // Placeholder
-      const result = await this.insertVendim(
-        {
-          number: `PLACEHOLDER-${sha256.slice(0, 8)}`,
-          signedDate: null,
-        },
-        meeting,
-        sourceId,
-        municipalityId,
-        docVersion.id,
-        `[PLACEHOLDER] Vendime Keshillit – ${meeting.date} (PDF kërkon rishikim manual)`,
-      );
-      return result;
-    }
-
-    let seen = 0;
-    let created = 0;
-    for (const decision of decisions) {
-      const result = await this.insertVendim(
-        decision,
-        meeting,
-        sourceId,
-        municipalityId,
-        docVersion.id,
-        null,
-      );
-      seen += result.seen;
-      created += result.created;
-    }
-    return { seen, created };
+    return this.insertVendim(
+      { number, signedDate: null },
+      { date: meetingDate, pdfUrl },
+      sourceId,
+      municipalityId,
+      docVersion.id,
+      titleOverride,
+    );
   }
 
   private async upsertDocument(
@@ -427,44 +451,6 @@ export class PogradecVendimeScraper extends BaseScraper {
     return { id: v.id };
   }
 
-  private async extractDecisions(buffer: Buffer): Promise<Decision[]> {
-    let text = '';
-
-    try {
-      const data = await pdfParse(buffer);
-      text = data.text;
-    } catch (err) {
-      this.logger.warn({ err }, 'pdf-parse failed');
-    }
-
-    if (text.trim().length < 100) {
-      this.logger.info('Low text from pdf-parse — trying OCR');
-      try {
-        text = await ocrBuffer(buffer);
-      } catch (err) {
-        this.logger.warn({ err }, 'tesseract OCR failed');
-      }
-    }
-
-    if (text.trim().length < 100) {
-      this.logger.warn('Insufficient text after OCR — will use placeholder row');
-      return [];
-    }
-
-    const decisions: Decision[] = [];
-    const regex =
-      /(?:VKB|Vendim)\s+nr\.?\s+(\d+)(?:\s+dat[ëe]\s+(\d{1,2}[.\-/]\d{1,2}[.\-/]\d{2,5}))?/gi;
-
-    for (const match of text.matchAll(regex)) {
-      const number = match[1]?.trim();
-      if (!number) continue;
-      const signedDate = match[2] ? parseMeetingDate(match[2]) : null;
-      decisions.push({ number, signedDate });
-    }
-
-    return decisions;
-  }
-
   private async insertVendim(
     decision: Decision,
     meeting: Meeting,
@@ -478,7 +464,7 @@ export class PogradecVendimeScraper extends BaseScraper {
       : Number.parseInt(meeting.date.slice(0, 4), 10);
 
     const dedupKey = `vendime:pogradec:${decision.number}:${yearSigned}`;
-    const title = titleOverride ?? `Vendim nr. ${decision.number} (${meeting.date})`;
+    const title = titleOverride ?? `VKB nr ${decision.number} datë ${meeting.date}`;
 
     const [inserted] = await db
       .insert(vendime)
