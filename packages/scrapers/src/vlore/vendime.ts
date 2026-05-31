@@ -171,36 +171,44 @@ export class VloreVendimeScraper extends BaseScraper {
 
       for (const entry of limited) {
         await this.delay(1500 + Math.random() * 500);
-
-        // Resolve PDF: direct link from listing, or fall back to the post page
-        const resolvedPdfUrl = entry.pdfUrl ?? (await this.fetchPdfUrl(entry.postUrl));
-
         let docVersionId: string | null = null;
 
-        if (resolvedPdfUrl) {
-          const docRes = await fetch(resolvedPdfUrl, { headers: HTTP_HEADERS });
-          if (!docRes.ok) {
-            this.logger.warn(
-              { url: resolvedPdfUrl, status: docRes.status },
-              'Document download failed — inserting row without document',
-            );
-          } else {
-            const buffer = Buffer.from(await docRes.arrayBuffer());
-            const sha256 = createHash('sha256').update(buffer).digest('hex');
-            const { ext, mime } = deriveDocFormat(resolvedPdfUrl);
-            if (ext === 'bin') {
+        try {
+          // Resolve PDF: direct link from listing, or fall back to the post page.
+          // fetchPdfUrl itself is safe (returns null on any network failure).
+          const resolvedPdfUrl = entry.pdfUrl ?? (await this.fetchPdfUrl(entry.postUrl));
+
+          if (resolvedPdfUrl) {
+            const docRes = await this.fetchWithRetry(resolvedPdfUrl, { headers: HTTP_HEADERS });
+            if (!docRes.ok) {
               this.logger.warn(
-                { url: resolvedPdfUrl },
-                'unknown document format — storing as .bin',
+                { url: resolvedPdfUrl, status: docRes.status },
+                'Document download failed — inserting row without document',
               );
+            } else {
+              const buffer = Buffer.from(await docRes.arrayBuffer());
+              const sha256 = createHash('sha256').update(buffer).digest('hex');
+              const { ext, mime } = deriveDocFormat(resolvedPdfUrl);
+              if (ext === 'bin') {
+                this.logger.warn(
+                  { url: resolvedPdfUrl },
+                  'unknown document format — storing as .bin',
+                );
+              }
+              const storageKey = `vlore/vendime/${sha256}.${ext}`;
+              await this.storage.upload(storageKey, buffer, mime);
+              const doc = await this.upsertDocument(sha256, storageKey, buffer.length, mime);
+              if (doc.isNew) void stampDocument(doc.id, sha256, this.logger);
+              const docVersion = await this.upsertDocumentVersion(doc.id, resolvedPdfUrl);
+              docVersionId = docVersion.id;
             }
-            const storageKey = `vlore/vendime/${sha256}.${ext}`;
-            await this.storage.upload(storageKey, buffer, mime);
-            const doc = await this.upsertDocument(sha256, storageKey, buffer.length, mime);
-            if (doc.isNew) void stampDocument(doc.id, sha256, this.logger);
-            const docVersion = await this.upsertDocumentVersion(doc.id, resolvedPdfUrl);
-            docVersionId = docVersion.id;
           }
+        } catch (err) {
+          // One bad fetch must not crash the whole run — record the row, skip the doc.
+          this.logger.warn(
+            { postUrl: entry.postUrl, err: String(err) },
+            'fetch failed — skipping document, recording row without it',
+          );
         }
 
         const result = await this.insertVendim(entry, docVersionId, sourceId, municipalityId);
@@ -323,35 +331,40 @@ export class VloreVendimeScraper extends BaseScraper {
   }
 
   private async fetchPdfUrl(postUrl: string): Promise<string | null> {
-    const res = await fetch(postUrl, { headers: HTTP_HEADERS });
-    if (!res.ok) {
-      this.logger.warn({ postUrl, status: res.status }, 'Post page fetch failed');
+    try {
+      const res = await this.fetchWithRetry(postUrl, { headers: HTTP_HEADERS });
+      if (!res.ok) {
+        this.logger.warn({ postUrl, status: res.status }, 'Post page fetch failed');
+        return null;
+      }
+      const html = await res.text();
+      const $ = cheerio.load(html);
+
+      let pdfUrl: string | null = null;
+      $('a[href$=".pdf"]').each((_i, el) => {
+        if (pdfUrl) return; // take only the first
+        const href = $(el).attr('href') ?? '';
+        if (!href) return;
+        const candidate = href.startsWith('http') ? href : new URL(href, postUrl).toString();
+        try {
+          if (ALLOWED_HOSTS.includes(new URL(candidate).hostname)) {
+            pdfUrl = candidate;
+          } else {
+            this.logger.warn({ candidate }, 'Off-domain PDF on post page — skipping');
+          }
+        } catch {
+          this.logger.warn({ href }, 'Invalid PDF href on post page — skipping');
+        }
+      });
+
+      if (!pdfUrl) {
+        this.logger.warn({ postUrl }, 'No PDF found on post page — inserting row without document');
+      }
+      return pdfUrl;
+    } catch (err) {
+      this.logger.warn({ postUrl, err: String(err) }, 'Post page fetch failed — skipping document');
       return null;
     }
-    const html = await res.text();
-    const $ = cheerio.load(html);
-
-    let pdfUrl: string | null = null;
-    $('a[href$=".pdf"]').each((_i, el) => {
-      if (pdfUrl) return; // take only the first
-      const href = $(el).attr('href') ?? '';
-      if (!href) return;
-      const candidate = href.startsWith('http') ? href : new URL(href, postUrl).toString();
-      try {
-        if (ALLOWED_HOSTS.includes(new URL(candidate).hostname)) {
-          pdfUrl = candidate;
-        } else {
-          this.logger.warn({ candidate }, 'Off-domain PDF on post page — skipping');
-        }
-      } catch {
-        this.logger.warn({ href }, 'Invalid PDF href on post page — skipping');
-      }
-    });
-
-    if (!pdfUrl) {
-      this.logger.warn({ postUrl }, 'No PDF found on post page — inserting row without document');
-    }
-    return pdfUrl;
   }
 
   private async upsertDocument(
@@ -467,6 +480,31 @@ export class VloreVendimeScraper extends BaseScraper {
     }
 
     return { seen: 1, created: 1 };
+  }
+
+  // Retry on network throws (UND_ERR_SOCKET, timeout, etc.) with exponential backoff.
+  // Non-2xx responses are returned to the caller; only thrown errors are retried.
+  private async fetchWithRetry(
+    url: string,
+    opts: Parameters<typeof fetch>[1] = {},
+    maxRetries = 2,
+  ) {
+    const backoffs = [2_000, 4_000];
+    let lastErr: unknown;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      if (attempt > 0) {
+        await this.delay(backoffs[attempt - 1] ?? 4_000);
+        this.logger.warn({ url, attempt }, 'retrying after network error');
+      }
+      try {
+        return await fetch(url, { ...opts, signal: AbortSignal.timeout(30_000) });
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+
+    throw lastErr;
   }
 
   private delay(ms: number): Promise<void> {

@@ -164,25 +164,32 @@ export class TiranaVendimeScraper extends BaseScraper {
 
         let docVersionId: string | null = null;
 
-        const docRes = await fetch(entry.docUrl, { headers: HTTP_HEADERS });
-        if (!docRes.ok) {
-          this.logger.warn(
-            { url: entry.docUrl, status: docRes.status },
-            'Document download failed — inserting row without document',
-          );
-        } else {
-          const buffer = Buffer.from(await docRes.arrayBuffer());
-          const sha256 = createHash('sha256').update(buffer).digest('hex');
-          const { ext, mime } = deriveDocFormat(entry.docUrl);
-          if (ext === 'bin') {
-            this.logger.warn({ url: entry.docUrl }, 'unknown document format — storing as .bin');
+        try {
+          const docRes = await this.fetchWithRetry(entry.docUrl, { headers: HTTP_HEADERS });
+          if (!docRes.ok) {
+            this.logger.warn(
+              { url: entry.docUrl, status: docRes.status },
+              'Document download failed — inserting row without document',
+            );
+          } else {
+            const buffer = Buffer.from(await docRes.arrayBuffer());
+            const sha256 = createHash('sha256').update(buffer).digest('hex');
+            const { ext, mime } = deriveDocFormat(entry.docUrl);
+            if (ext === 'bin') {
+              this.logger.warn({ url: entry.docUrl }, 'unknown document format — storing as .bin');
+            }
+            const storageKey = `tirana/vendime/${sha256}.${ext}`;
+            await this.storage.upload(storageKey, buffer, mime);
+            const doc = await this.upsertDocument(sha256, storageKey, buffer.length, mime);
+            if (doc.isNew) void stampDocument(doc.id, sha256, this.logger);
+            const docVersion = await this.upsertDocumentVersion(doc.id, entry.docUrl);
+            docVersionId = docVersion.id;
           }
-          const storageKey = `tirana/vendime/${sha256}.${ext}`;
-          await this.storage.upload(storageKey, buffer, mime);
-          const doc = await this.upsertDocument(sha256, storageKey, buffer.length, mime);
-          if (doc.isNew) void stampDocument(doc.id, sha256, this.logger);
-          const docVersion = await this.upsertDocumentVersion(doc.id, entry.docUrl);
-          docVersionId = docVersion.id;
+        } catch (err) {
+          this.logger.warn(
+            { docUrl: entry.docUrl, err: String(err) },
+            'fetch failed — skipping document',
+          );
         }
 
         const result = await this.insertVendim(entry, docVersionId, sourceId, municipalityId);
@@ -414,6 +421,29 @@ export class TiranaVendimeScraper extends BaseScraper {
     }
 
     return { seen: 1, created: 1 };
+  }
+
+  private async fetchWithRetry(
+    url: string,
+    opts: Parameters<typeof fetch>[1] = {},
+    maxRetries = 2,
+  ) {
+    const backoffs = [2_000, 4_000];
+    let lastErr: unknown;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      if (attempt > 0) {
+        await this.delay(backoffs[attempt - 1] ?? 4_000);
+        this.logger.warn({ url, attempt }, 'retrying after network error');
+      }
+      try {
+        return await fetch(url, { ...opts, signal: AbortSignal.timeout(30_000) });
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+
+    throw lastErr;
   }
 
   private delay(ms: number): Promise<void> {

@@ -163,27 +163,34 @@ export class ShkoderVendimeScraper extends BaseScraper {
 
         let docVersionId: string | null = null;
         if (pdfUrl) {
-          const pdfRes = await fetch(pdfUrl, {
-            headers: { ...HTTP_HEADERS, Accept: 'application/pdf' },
-          });
-          if (!pdfRes.ok) {
-            this.logger.warn(
-              { url: pdfUrl, status: pdfRes.status },
-              'PDF download failed — inserting row without document',
-            );
-          } else {
-            const buffer = Buffer.from(await pdfRes.arrayBuffer());
-            const sha256 = createHash('sha256').update(buffer).digest('hex');
-            const { ext, mime } = deriveDocFormat(pdfUrl);
-            if (ext === 'bin') {
-              this.logger.warn({ url: pdfUrl }, 'unknown document format — storing as .bin');
+          try {
+            const pdfRes = await this.fetchWithRetry(pdfUrl, {
+              headers: { ...HTTP_HEADERS, Accept: 'application/pdf' },
+            });
+            if (!pdfRes.ok) {
+              this.logger.warn(
+                { url: pdfUrl, status: pdfRes.status },
+                'PDF download failed — inserting row without document',
+              );
+            } else {
+              const buffer = Buffer.from(await pdfRes.arrayBuffer());
+              const sha256 = createHash('sha256').update(buffer).digest('hex');
+              const { ext, mime } = deriveDocFormat(pdfUrl);
+              if (ext === 'bin') {
+                this.logger.warn({ url: pdfUrl }, 'unknown document format — storing as .bin');
+              }
+              const storageKey = `shkoder/vendime/${sha256}.${ext}`;
+              await this.storage.upload(storageKey, buffer, mime);
+              const doc = await this.upsertDocument(sha256, storageKey, buffer.length, mime);
+              if (doc.isNew) void stampDocument(doc.id, sha256, this.logger);
+              const docVersion = await this.upsertDocumentVersion(doc.id, pdfUrl);
+              docVersionId = docVersion.id;
             }
-            const storageKey = `shkoder/vendime/${sha256}.${ext}`;
-            await this.storage.upload(storageKey, buffer, mime);
-            const doc = await this.upsertDocument(sha256, storageKey, buffer.length, mime);
-            if (doc.isNew) void stampDocument(doc.id, sha256, this.logger);
-            const docVersion = await this.upsertDocumentVersion(doc.id, pdfUrl);
-            docVersionId = docVersion.id;
+          } catch (err) {
+            this.logger.warn(
+              { postUrl: entry.postUrl, err: String(err) },
+              'fetch failed — skipping document',
+            );
           }
         }
 
@@ -283,35 +290,40 @@ export class ShkoderVendimeScraper extends BaseScraper {
   }
 
   private async fetchPdfUrl(postUrl: string): Promise<string | null> {
-    const res = await fetch(postUrl, { headers: HTTP_HEADERS });
-    if (!res.ok) {
-      this.logger.warn({ postUrl, status: res.status }, 'Post page fetch failed');
+    try {
+      const res = await this.fetchWithRetry(postUrl, { headers: HTTP_HEADERS });
+      if (!res.ok) {
+        this.logger.warn({ postUrl, status: res.status }, 'Post page fetch failed');
+        return null;
+      }
+      const html = await res.text();
+      const $ = cheerio.load(html);
+
+      let pdfUrl: string | null = null;
+      $('a[href*="/wp-content/uploads/"][href$=".pdf"]').each((_i, el) => {
+        if (pdfUrl) return; // take only the first
+        const href = $(el).attr('href') ?? '';
+        if (!href) return;
+        const candidate = href.startsWith('http') ? href : new URL(href, postUrl).toString();
+        try {
+          if (new URL(candidate).hostname === ALLOWED_HOST) {
+            pdfUrl = candidate;
+          } else {
+            this.logger.warn({ candidate }, 'Off-domain PDF — skipping');
+          }
+        } catch {
+          this.logger.warn({ href }, 'Invalid PDF href — skipping');
+        }
+      });
+
+      if (!pdfUrl) {
+        this.logger.warn({ postUrl }, 'No PDF found on post page — inserting row without document');
+      }
+      return pdfUrl;
+    } catch (err) {
+      this.logger.warn({ postUrl, err: String(err) }, 'Post page fetch failed — skipping document');
       return null;
     }
-    const html = await res.text();
-    const $ = cheerio.load(html);
-
-    let pdfUrl: string | null = null;
-    $('a[href*="/wp-content/uploads/"][href$=".pdf"]').each((_i, el) => {
-      if (pdfUrl) return; // take only the first
-      const href = $(el).attr('href') ?? '';
-      if (!href) return;
-      const candidate = href.startsWith('http') ? href : new URL(href, postUrl).toString();
-      try {
-        if (new URL(candidate).hostname === ALLOWED_HOST) {
-          pdfUrl = candidate;
-        } else {
-          this.logger.warn({ candidate }, 'Off-domain PDF — skipping');
-        }
-      } catch {
-        this.logger.warn({ href }, 'Invalid PDF href — skipping');
-      }
-    });
-
-    if (!pdfUrl) {
-      this.logger.warn({ postUrl }, 'No PDF found on post page — inserting row without document');
-    }
-    return pdfUrl;
   }
 
   private async upsertDocument(
@@ -421,6 +433,29 @@ export class ShkoderVendimeScraper extends BaseScraper {
     }
 
     return { seen: 1, created: 1 };
+  }
+
+  private async fetchWithRetry(
+    url: string,
+    opts: Parameters<typeof fetch>[1] = {},
+    maxRetries = 2,
+  ) {
+    const backoffs = [2_000, 4_000];
+    let lastErr: unknown;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      if (attempt > 0) {
+        await this.delay(backoffs[attempt - 1] ?? 4_000);
+        this.logger.warn({ url, attempt }, 'retrying after network error');
+      }
+      try {
+        return await fetch(url, { ...opts, signal: AbortSignal.timeout(30_000) });
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+
+    throw lastErr;
   }
 
   private delay(ms: number): Promise<void> {

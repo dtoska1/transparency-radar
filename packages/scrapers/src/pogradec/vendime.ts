@@ -270,9 +270,24 @@ export class PogradecVendimeScraper extends BaseScraper {
   }
 
   private async fetchDetailPage(detailUrl: string): Promise<DetailPage | null> {
-    const res = await fetch(detailUrl, { headers: HTTP_HEADERS });
-    if (!res.ok) throw new Error(`Detail page fetch failed (${res.status}): ${detailUrl}`);
-    const html = await res.text();
+    let html: string;
+    try {
+      const res = await this.fetchWithRetry(detailUrl, { headers: HTTP_HEADERS });
+      if (!res.ok) {
+        this.logger.warn(
+          { detailUrl, status: res.status },
+          'Detail page fetch failed — skipping meeting',
+        );
+        return null;
+      }
+      html = await res.text();
+    } catch (err) {
+      this.logger.warn(
+        { detailUrl, err: String(err) },
+        'Detail page fetch failed — skipping meeting',
+      );
+      return null;
+    }
 
     const $ = cheerio.load(html);
 
@@ -357,14 +372,20 @@ export class PogradecVendimeScraper extends BaseScraper {
     this.logger.debug({ pdfUrl }, 'Processing PDF');
 
     // Download
-    const pdfRes = await fetch(pdfUrl, {
-      headers: { ...HTTP_HEADERS, Accept: 'application/pdf' },
-    });
-    if (!pdfRes.ok) {
-      this.logger.warn({ url: pdfUrl, status: pdfRes.status }, 'PDF download failed — skipping');
+    let buffer: Buffer;
+    try {
+      const pdfRes = await this.fetchWithRetry(pdfUrl, {
+        headers: { ...HTTP_HEADERS, Accept: 'application/pdf' },
+      });
+      if (!pdfRes.ok) {
+        this.logger.warn({ url: pdfUrl, status: pdfRes.status }, 'PDF download failed — skipping');
+        return { seen: 0, created: 0 };
+      }
+      buffer = Buffer.from(await pdfRes.arrayBuffer());
+    } catch (err) {
+      this.logger.warn({ pdfUrl, err: String(err) }, 'fetch failed — skipping document');
       return { seen: 0, created: 0 };
     }
-    const buffer = Buffer.from(await pdfRes.arrayBuffer());
 
     // SHA-256
     const sha256 = createHash('sha256').update(buffer).digest('hex');
@@ -531,6 +552,29 @@ export class PogradecVendimeScraper extends BaseScraper {
     });
 
     return { seen: 1, created: 1 };
+  }
+
+  private async fetchWithRetry(
+    url: string,
+    opts: Parameters<typeof fetch>[1] = {},
+    maxRetries = 2,
+  ) {
+    const backoffs = [2_000, 4_000];
+    let lastErr: unknown;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      if (attempt > 0) {
+        await this.delay(backoffs[attempt - 1] ?? 4_000);
+        this.logger.warn({ url, attempt }, 'retrying after network error');
+      }
+      try {
+        return await fetch(url, { ...opts, signal: AbortSignal.timeout(30_000) });
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+
+    throw lastErr;
   }
 
   private delay(ms: number): Promise<void> {
