@@ -40,6 +40,20 @@ describe('deriveDocFormat', () => {
     ).toEqual({ ext: 'pdf', mime: 'application/pdf' });
   });
 
+  it('maps rar', () => {
+    expect(deriveDocFormat('https://x/archive.rar')).toEqual({
+      ext: 'rar',
+      mime: 'application/vnd.rar',
+    });
+  });
+
+  it('maps 7z', () => {
+    expect(deriveDocFormat('https://x/archive.7z')).toEqual({
+      ext: '7z',
+      mime: 'application/x-7z-compressed',
+    });
+  });
+
   it('falls back to bin for no extension', () => {
     expect(deriveDocFormat('https://x/document')).toEqual({
       ext: 'bin',
