@@ -9,7 +9,8 @@
     "typecheck": "tsc --noEmit",
     "run:pogradec:vendime": "tsx src/pogradec/run.ts",
     "run:shkoder:vendime": "tsx src/shkoder/run.ts",
-    "run:durres:vendime": "tsx src/durres/run.ts"
+    "run:durres:vendime": "tsx src/durres/run.ts",
+    "run:tirana:vendime": "tsx src/tirana/run.ts"
   },
   "dependencies": {
     "@tra/db": "workspace:*",
