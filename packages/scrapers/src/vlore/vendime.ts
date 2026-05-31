@@ -1,0 +1,475 @@
+import { createHash } from 'node:crypto';
+import { db } from '@tra/db';
+import {
+  document_versions,
+  documents,
+  municipalities,
+  scrape_runs,
+  sources,
+  vendim_documents,
+  vendime,
+} from '@tra/db';
+import { LocalDiskAdapter, deriveDocFormat } from '@tra/shared';
+import * as cheerio from 'cheerio';
+import { and, desc, eq } from 'drizzle-orm';
+import { fetch } from 'undici';
+import { BaseScraper } from '../base-scraper.js';
+
+const CATEGORY_URL = 'https://www.vendime.al/category/vlore/';
+const BASE_ORIGIN = 'https://www.vendime.al';
+const SOURCE_ORIGIN = 'vendime.al';
+const ALLOWED_HOSTS = ['www.vendime.al', 'vendime.al'];
+const MANDATE_START = '2023-01-01';
+const MAX_PAGES = 60;
+
+// Identifiable UA matching the INFOÇIP-granted access permission;
+// Accept-Language identical to the other scrapers.
+const HTTP_HEADERS = {
+  'User-Agent':
+    'TransparencyRadarBot/1.0 (+https://github.com/dtoska1/transparency-radar; CSDG; dtoska@csdgalbania.org)',
+  'Accept-Language': 'sq-AL,sq;q=0.9,en;q=0.8',
+};
+
+// ── TSQ builder (RFC-3161 SHA-256, 59 bytes, no external lib) ─────────────────
+
+const TSQ_PREFIX = Buffer.from('303902010130313' + '00d060960864801650304020105000420', 'hex');
+const TSQ_SUFFIX = Buffer.from('0101ff', 'hex');
+
+function buildTsq(sha256Hex: string): Buffer {
+  const hashBytes = Buffer.from(sha256Hex, 'hex');
+  return Buffer.concat([TSQ_PREFIX, hashBytes, TSQ_SUFFIX]);
+}
+
+// ── Date helpers ──────────────────────────────────────────────────────────────
+
+function parseMeetingDate(raw: string): string | null {
+  const normalized = raw.replace(/[-/]/g, '.').trim();
+  const match = normalized.match(/(\d{1,2})\.(\d{1,2})\.(\d{2,5})/);
+  if (!match) return null;
+
+  let [, dd, mm, yyyy] = match as [string, string, string, string];
+
+  if (yyyy.length === 2) {
+    const y = Number.parseInt(yyyy, 10);
+    yyyy = y <= 30 ? `20${yyyy.padStart(2, '0')}` : `19${yyyy.padStart(2, '0')}`;
+  } else if (yyyy.length === 5 && yyyy.startsWith('20')) {
+    yyyy = yyyy.slice(0, 4);
+  }
+
+  const isoDate = `${yyyy}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
+  const date = new Date(isoDate);
+  if (Number.isNaN(date.getTime())) return null;
+
+  return isoDate;
+}
+
+function isValidYear(isoDate: string): boolean {
+  const year = Number.parseInt(isoDate.slice(0, 4), 10);
+  return year >= 2018 && year <= 2027;
+}
+
+// ── FreeTSA (async, fire-and-forget) ─────────────────────────────────────────
+
+async function stampDocument(
+  docId: string,
+  sha256Hex: string,
+  logger: import('pino').Logger,
+): Promise<void> {
+  try {
+    const tsq = buildTsq(sha256Hex);
+    const res = await fetch('https://freetsa.org/tsr', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/timestamp-query',
+        Accept: 'application/timestamp-reply',
+      },
+      body: tsq,
+    });
+    if (!res.ok) throw new Error(`FreeTSA responded ${res.status}`);
+    const tsr = Buffer.from(await res.arrayBuffer());
+    await db
+      .update(documents)
+      .set({ tsr_token: tsr.toString('base64'), tsr_timestamp_at: new Date() })
+      .where(eq(documents.id, docId));
+  } catch (err) {
+    logger.warn({ err, docId }, 'FreeTSA timestamp failed — tsr_token left null');
+  }
+}
+
+// ── Scraper ───────────────────────────────────────────────────────────────────
+
+interface DecisionEntry {
+  postUrl: string;
+  number: string | null; // null for number-less posts
+  date: string; // ISO YYYY-MM-DD
+  title: string;
+  pdfUrl: string | null; // direct from listing if present; else resolved from post page
+}
+
+interface ProcessResult {
+  seen: number;
+  created: number;
+}
+
+export class VloreVendimeScraper extends BaseScraper {
+  private readonly storage: LocalDiskAdapter;
+  private readonly firstRunLimit: number; // max decisions, not pages
+
+  constructor(opts: { firstRunLimit?: number } = {}) {
+    super('vlore', 'vendime');
+    this.storage = new LocalDiskAdapter(process.env.STORAGE_LOCAL_PATH ?? './uploads');
+    this.firstRunLimit = opts.firstRunLimit ?? 10;
+  }
+
+  async run(): Promise<void> {
+    const { sourceId, municipalityId } = await this.lookupSource();
+
+    const [runRow] = await db
+      .insert(scrape_runs)
+      .values({
+        source_id: sourceId,
+        municipality_id: municipalityId,
+        vertical: 'vendime',
+        started_at: new Date(),
+        status: 'running',
+      })
+      .returning({ id: scrape_runs.id });
+
+    if (!runRow) throw new Error('Failed to insert scrape_run row');
+    const runId = runRow.id;
+    let totalSeen = 0;
+    let totalNew = 0;
+
+    try {
+      const collected: DecisionEntry[] = [];
+
+      for (let page = 1; page <= MAX_PAGES; page++) {
+        if (collected.length >= this.firstRunLimit) break;
+
+        const pageEntries = await this.fetchPage(page);
+
+        if (pageEntries.length === 0) {
+          this.logger.info({ page }, 'Empty page — stopping pagination');
+          break;
+        }
+
+        collected.push(...pageEntries);
+
+        // Stop if the entire page is pre-mandate (walking toward 2007)
+        if (pageEntries.every((e) => e.date < MANDATE_START)) {
+          this.logger.info({ page }, 'All entries pre-mandate — stopping pagination');
+          break;
+        }
+
+        if (collected.length < this.firstRunLimit) {
+          await this.delay(2500 + Math.random() * 500);
+        }
+      }
+
+      const limited = collected.slice(0, this.firstRunLimit);
+      this.logger.info({ total: collected.length, processing: limited.length }, 'Decisions ready');
+
+      for (const entry of limited) {
+        await this.delay(1500 + Math.random() * 500);
+
+        // Resolve PDF: direct link from listing, or fall back to the post page
+        const resolvedPdfUrl = entry.pdfUrl ?? (await this.fetchPdfUrl(entry.postUrl));
+
+        let docVersionId: string | null = null;
+
+        if (resolvedPdfUrl) {
+          const docRes = await fetch(resolvedPdfUrl, { headers: HTTP_HEADERS });
+          if (!docRes.ok) {
+            this.logger.warn(
+              { url: resolvedPdfUrl, status: docRes.status },
+              'Document download failed — inserting row without document',
+            );
+          } else {
+            const buffer = Buffer.from(await docRes.arrayBuffer());
+            const sha256 = createHash('sha256').update(buffer).digest('hex');
+            const { ext, mime } = deriveDocFormat(resolvedPdfUrl);
+            if (ext === 'bin') {
+              this.logger.warn(
+                { url: resolvedPdfUrl },
+                'unknown document format — storing as .bin',
+              );
+            }
+            const storageKey = `vlore/vendime/${sha256}.${ext}`;
+            await this.storage.upload(storageKey, buffer, mime);
+            const doc = await this.upsertDocument(sha256, storageKey, buffer.length, mime);
+            if (doc.isNew) void stampDocument(doc.id, sha256, this.logger);
+            const docVersion = await this.upsertDocumentVersion(doc.id, resolvedPdfUrl);
+            docVersionId = docVersion.id;
+          }
+        }
+
+        const result = await this.insertVendim(entry, docVersionId, sourceId, municipalityId);
+        totalSeen += result.seen;
+        totalNew += result.created;
+      }
+
+      await db
+        .update(scrape_runs)
+        .set({
+          finished_at: new Date(),
+          status: 'success',
+          items_seen: totalSeen,
+          items_new: totalNew,
+          items_updated: 0,
+        })
+        .where(eq(scrape_runs.id, runId));
+
+      this.logger.info({ runId, totalSeen, totalNew }, 'Scrape run complete');
+    } catch (err) {
+      await db
+        .update(scrape_runs)
+        .set({
+          finished_at: new Date(),
+          status: 'error',
+          items_seen: totalSeen,
+          items_new: totalNew,
+          items_updated: 0,
+          error_message: String(err),
+        })
+        .where(eq(scrape_runs.id, runId));
+      throw err;
+    }
+  }
+
+  private async lookupSource(): Promise<{ sourceId: string; municipalityId: string }> {
+    const [found] = await db
+      .select({ sourceId: sources.id, municipalityId: sources.municipality_id })
+      .from(sources)
+      .innerJoin(municipalities, eq(sources.municipality_id, municipalities.id))
+      .where(and(eq(municipalities.slug, 'vlore'), eq(sources.vertical, 'vendime')))
+      .limit(1);
+
+    if (!found) throw new Error('Source not found for vlore/vendime — run db:seed:sources first');
+    return { sourceId: found.sourceId, municipalityId: found.municipalityId };
+  }
+
+  private async fetchPage(pageNum: number): Promise<DecisionEntry[]> {
+    const pageUrl = pageNum === 1 ? CATEGORY_URL : `${CATEGORY_URL}page/${pageNum}/`;
+
+    const res = await fetch(pageUrl, { headers: HTTP_HEADERS });
+    if (res.status !== 200) {
+      this.logger.warn({ pageNum, status: res.status }, 'Non-200 page — stopping pagination');
+      return [];
+    }
+    const html = await res.text();
+    const $ = cheerio.load(html);
+
+    // Capped-run structure gate: log the first entry's raw HTML so selectors
+    // can be confirmed before any backfill (inferred structure, not pixel-confirmed).
+    if (pageNum === 1) {
+      this.logger.info(
+        { sampleHtml: $.html($('article, .post, .type-post').first()).slice(0, 1500) },
+        'first entry raw HTML — confirm selectors before backfill',
+      );
+    }
+
+    const seen = new Set<string>();
+    const entries: DecisionEntry[] = [];
+
+    $('article, .post, .type-post').each((_i, el) => {
+      const $el = $(el);
+
+      const $titleLink = $el.find('h1 a, h2 a, h3 a, .entry-title a').first();
+      const hrefRaw = $titleLink.attr('href');
+      if (!hrefRaw) return;
+
+      const postUrl = hrefRaw.startsWith('http')
+        ? hrefRaw
+        : new URL(hrefRaw, BASE_ORIGIN).toString();
+      if (seen.has(postUrl)) return;
+      seen.add(postUrl);
+
+      const titleText = $titleLink.text().trim();
+      const number = titleText.match(/nr\.?\s*(\d+)/i)?.[1] ?? null;
+      const date = parseMeetingDate(titleText);
+      if (!date || !isValidYear(date)) return;
+      if (date < MANDATE_START) return;
+
+      // Direct PDF link in the listing entry (may be absent — dual-path handles it)
+      const directHref = $el.find('a[href$=".pdf"]').first().attr('href') ?? null;
+      let pdfUrl: string | null = null;
+      if (directHref) {
+        try {
+          const candidate = directHref.startsWith('http')
+            ? directHref
+            : new URL(directHref, BASE_ORIGIN).toString();
+          if (ALLOWED_HOSTS.includes(new URL(candidate).hostname)) {
+            pdfUrl = candidate;
+          } else {
+            this.logger.warn({ candidate }, 'Off-domain PDF in listing — skipping direct link');
+          }
+        } catch {
+          this.logger.warn({ directHref }, 'Invalid PDF href in listing — skipping direct link');
+        }
+      }
+
+      const title = titleText || `VKB nr ${number} datë ${date}`;
+      entries.push({ postUrl, number, date, title, pdfUrl });
+    });
+
+    if (pageNum === 1 && entries.length === 0) {
+      this.logger.error(
+        { htmlSnippet: html.slice(0, 2000) },
+        'items_seen=0 — selector wrong, inspect snippet',
+      );
+    }
+
+    return entries;
+  }
+
+  private async fetchPdfUrl(postUrl: string): Promise<string | null> {
+    const res = await fetch(postUrl, { headers: HTTP_HEADERS });
+    if (!res.ok) {
+      this.logger.warn({ postUrl, status: res.status }, 'Post page fetch failed');
+      return null;
+    }
+    const html = await res.text();
+    const $ = cheerio.load(html);
+
+    let pdfUrl: string | null = null;
+    $('a[href$=".pdf"]').each((_i, el) => {
+      if (pdfUrl) return; // take only the first
+      const href = $(el).attr('href') ?? '';
+      if (!href) return;
+      const candidate = href.startsWith('http') ? href : new URL(href, postUrl).toString();
+      try {
+        if (ALLOWED_HOSTS.includes(new URL(candidate).hostname)) {
+          pdfUrl = candidate;
+        } else {
+          this.logger.warn({ candidate }, 'Off-domain PDF on post page — skipping');
+        }
+      } catch {
+        this.logger.warn({ href }, 'Invalid PDF href on post page — skipping');
+      }
+    });
+
+    if (!pdfUrl) {
+      this.logger.warn({ postUrl }, 'No PDF found on post page — inserting row without document');
+    }
+    return pdfUrl;
+  }
+
+  private async upsertDocument(
+    sha256: string,
+    storageKey: string,
+    byteSize: number,
+    mime = 'application/pdf',
+  ): Promise<{ id: string; isNew: boolean }> {
+    const [inserted] = await db
+      .insert(documents)
+      .values({
+        sha256,
+        storage_uri: storageKey,
+        mime_type: mime,
+        byte_size: byteSize,
+        first_seen_at: new Date(),
+      })
+      .onConflictDoNothing({ target: documents.sha256 })
+      .returning({ id: documents.id });
+
+    if (inserted) return { id: inserted.id, isNew: true };
+
+    const [existing] = await db
+      .select({ id: documents.id })
+      .from(documents)
+      .where(eq(documents.sha256, sha256))
+      .limit(1);
+
+    if (!existing) throw new Error(`Document with sha256 ${sha256} not found after conflict`);
+    return { id: existing.id, isNew: false };
+  }
+
+  private async upsertDocumentVersion(
+    documentId: string,
+    slotRef: string,
+  ): Promise<{ id: string }> {
+    const [latest] = await db
+      .select()
+      .from(document_versions)
+      .where(eq(document_versions.slot_ref, slotRef))
+      .orderBy(desc(document_versions.version_no))
+      .limit(1);
+
+    if (!latest) {
+      const [v] = await db
+        .insert(document_versions)
+        .values({ document_id: documentId, slot_ref: slotRef, version_no: 1 })
+        .returning({ id: document_versions.id });
+      if (!v) throw new Error('document_versions insert returned nothing');
+      return { id: v.id };
+    }
+
+    if (latest.document_id === documentId) {
+      return { id: latest.id };
+    }
+
+    this.logger.warn(
+      { slotRef, oldDocId: latest.document_id, newDocId: documentId },
+      'Content-change detected for slot_ref — inserting new version',
+    );
+    const [v] = await db
+      .insert(document_versions)
+      .values({ document_id: documentId, slot_ref: slotRef, version_no: latest.version_no + 1 })
+      .returning({ id: document_versions.id });
+    if (!v) throw new Error('document_versions insert returned nothing');
+    return { id: v.id };
+  }
+
+  private async insertVendim(
+    entry: DecisionEntry,
+    docVersionId: string | null,
+    sourceId: string,
+    municipalityId: string,
+  ): Promise<ProcessResult> {
+    const yearSigned = Number.parseInt(entry.date.slice(0, 4), 10);
+    // Derive a stable URL-based slug for placeholder rows — avoids null number_normalized
+    const postSlug = new URL(entry.postUrl).pathname.split('/').filter(Boolean).pop() ?? 'unknown';
+    const dedupKey = entry.number
+      ? `vendime:vlore:${entry.number}:${yearSigned}`
+      : `vendime:vlore:PLACEHOLDER:${postSlug}`;
+    const numberNormalized = entry.number ?? `PLACEHOLDER-${postSlug.slice(0, 16)}`;
+
+    const [inserted] = await db
+      .insert(vendime)
+      .values({
+        municipality_id: municipalityId,
+        source_id: sourceId,
+        source_origin: SOURCE_ORIGIN,
+        is_unofficial_proxy: true, // Vlorë is the documented proxy exception
+        source_page_url: CATEGORY_URL,
+        source_url: entry.postUrl, // per-decision page on vendime.al
+        dedup_key: dedupKey,
+        number_normalized: numberNormalized,
+        year_signed: yearSigned,
+        title: entry.title,
+        published_date: entry.date,
+        review_status: 'pending',
+        collected_at: new Date(),
+      })
+      .onConflictDoNothing({ target: vendime.dedup_key })
+      .returning({ id: vendime.id });
+
+    if (!inserted) {
+      this.logger.warn({ dedupKey }, 'dedup conflict — skipped');
+      return { seen: 1, created: 0 };
+    }
+
+    if (docVersionId) {
+      await db.insert(vendim_documents).values({
+        vendim_id: inserted.id,
+        document_version_id: docVersionId,
+      });
+    }
+
+    return { seen: 1, created: 1 };
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+}

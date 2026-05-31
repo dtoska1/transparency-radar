@@ -122,6 +122,7 @@ export const vendime = pgTable(
     summary: text('summary'),
     published_date: date('published_date').notNull(),
     review_status: reviewStatusEnum('review_status').notNull().default('pending'),
+    is_unofficial_proxy: boolean('is_unofficial_proxy').notNull().default(false),
     collected_at: timestamp('collected_at', { withTimezone: true }).notNull(),
     search_tsv: tsvector('search_tsv').generatedAlwaysAs(
       sql`to_tsvector('simple', coalesce(title, '') || ' ' || coalesce(summary, ''))`,
@@ -156,6 +157,7 @@ export const konsultime = pgTable(
     // kind distinguishes draft acts / projektakte from open consultations
     kind: konsultimeKindEnum('kind').notNull().default('consultation_notice'),
     review_status: reviewStatusEnum('review_status').notNull().default('pending'),
+    is_unofficial_proxy: boolean('is_unofficial_proxy').notNull().default(false),
     collected_at: timestamp('collected_at', { withTimezone: true }).notNull(),
     search_tsv: tsvector('search_tsv').generatedAlwaysAs(
       sql`to_tsvector('simple', coalesce(title, '') || ' ' || coalesce(summary, ''))`,
@@ -189,6 +191,7 @@ export const prokurime = pgTable(
     procurement_object: text('procurement_object').notNull(),
     published_date: date('published_date').notNull(),
     review_status: reviewStatusEnum('review_status').notNull().default('pending'),
+    is_unofficial_proxy: boolean('is_unofficial_proxy').notNull().default(false),
     collected_at: timestamp('collected_at', { withTimezone: true }).notNull(),
     search_tsv: tsvector('search_tsv').generatedAlwaysAs(
       sql`to_tsvector('simple', coalesce(title, '') || ' ' || coalesce(contracting_authority, '') || ' ' || coalesce(procurement_object, ''))`,

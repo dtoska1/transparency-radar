@@ -15,6 +15,13 @@
       "when": 1780096647188,
       "tag": "0001_mushy_luminals",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1780268209574,
+      "tag": "0002_short_pretty_boy",
+      "breakpoints": true
     }
   ]
 }
