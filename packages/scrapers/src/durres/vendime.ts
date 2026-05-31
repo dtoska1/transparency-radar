@@ -144,27 +144,34 @@ export class DurresVendimeScraper extends BaseScraper {
 
         let docVersionId: string | null = null;
 
-        const pdfRes = await fetch(entry.pdfUrl, {
-          headers: { ...HTTP_HEADERS, Accept: 'application/pdf' },
-        });
-        if (!pdfRes.ok) {
-          this.logger.warn(
-            { url: entry.pdfUrl, status: pdfRes.status },
-            'PDF download failed — inserting row without document',
-          );
-        } else {
-          const buffer = Buffer.from(await pdfRes.arrayBuffer());
-          const sha256 = createHash('sha256').update(buffer).digest('hex');
-          const { ext, mime } = deriveDocFormat(entry.pdfUrl);
-          if (ext === 'bin') {
-            this.logger.warn({ url: entry.pdfUrl }, 'unknown document format — storing as .bin');
+        try {
+          const pdfRes = await this.fetchWithRetry(entry.pdfUrl, {
+            headers: { ...HTTP_HEADERS, Accept: 'application/pdf' },
+          });
+          if (!pdfRes.ok) {
+            this.logger.warn(
+              { url: entry.pdfUrl, status: pdfRes.status },
+              'PDF download failed — inserting row without document',
+            );
+          } else {
+            const buffer = Buffer.from(await pdfRes.arrayBuffer());
+            const sha256 = createHash('sha256').update(buffer).digest('hex');
+            const { ext, mime } = deriveDocFormat(entry.pdfUrl);
+            if (ext === 'bin') {
+              this.logger.warn({ url: entry.pdfUrl }, 'unknown document format — storing as .bin');
+            }
+            const storageKey = `durres/vendime/${sha256}.${ext}`;
+            await this.storage.upload(storageKey, buffer, mime);
+            const doc = await this.upsertDocument(sha256, storageKey, buffer.length, mime);
+            if (doc.isNew) void stampDocument(doc.id, sha256, this.logger);
+            const docVersion = await this.upsertDocumentVersion(doc.id, entry.pdfUrl);
+            docVersionId = docVersion.id;
           }
-          const storageKey = `durres/vendime/${sha256}.${ext}`;
-          await this.storage.upload(storageKey, buffer, mime);
-          const doc = await this.upsertDocument(sha256, storageKey, buffer.length, mime);
-          if (doc.isNew) void stampDocument(doc.id, sha256, this.logger);
-          const docVersion = await this.upsertDocumentVersion(doc.id, entry.pdfUrl);
-          docVersionId = docVersion.id;
+        } catch (err) {
+          this.logger.warn(
+            { pdfUrl: entry.pdfUrl, err: String(err) },
+            'fetch failed — skipping document',
+          );
         }
 
         const result = await this.insertVendim(entry, docVersionId, sourceId, municipalityId);
@@ -388,6 +395,29 @@ export class DurresVendimeScraper extends BaseScraper {
     }
 
     return { seen: 1, created: 1 };
+  }
+
+  private async fetchWithRetry(
+    url: string,
+    opts: Parameters<typeof fetch>[1] = {},
+    maxRetries = 2,
+  ) {
+    const backoffs = [2_000, 4_000];
+    let lastErr: unknown;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      if (attempt > 0) {
+        await this.delay(backoffs[attempt - 1] ?? 4_000);
+        this.logger.warn({ url, attempt }, 'retrying after network error');
+      }
+      try {
+        return await fetch(url, { ...opts, signal: AbortSignal.timeout(30_000) });
+      } catch (err) {
+        lastErr = err;
+      }
+    }
+
+    throw lastErr;
   }
 
   private delay(ms: number): Promise<void> {
