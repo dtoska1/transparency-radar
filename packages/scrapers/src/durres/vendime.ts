@@ -9,7 +9,7 @@ import {
   vendim_documents,
   vendime,
 } from '@tra/db';
-import { LocalDiskAdapter } from '@tra/shared';
+import { LocalDiskAdapter, deriveDocFormat } from '@tra/shared';
 import * as cheerio from 'cheerio';
 import { and, desc, eq } from 'drizzle-orm';
 import { fetch } from 'undici';
@@ -155,9 +155,13 @@ export class DurresVendimeScraper extends BaseScraper {
         } else {
           const buffer = Buffer.from(await pdfRes.arrayBuffer());
           const sha256 = createHash('sha256').update(buffer).digest('hex');
-          const storageKey = `durres/vendime/${sha256}.pdf`;
-          await this.storage.upload(storageKey, buffer, 'application/pdf');
-          const doc = await this.upsertDocument(sha256, storageKey, buffer.length);
+          const { ext, mime } = deriveDocFormat(entry.pdfUrl);
+          if (ext === 'bin') {
+            this.logger.warn({ url: entry.pdfUrl }, 'unknown document format — storing as .bin');
+          }
+          const storageKey = `durres/vendime/${sha256}.${ext}`;
+          await this.storage.upload(storageKey, buffer, mime);
+          const doc = await this.upsertDocument(sha256, storageKey, buffer.length, mime);
           if (doc.isNew) void stampDocument(doc.id, sha256, this.logger);
           const docVersion = await this.upsertDocumentVersion(doc.id, entry.pdfUrl);
           docVersionId = docVersion.id;
@@ -281,13 +285,14 @@ export class DurresVendimeScraper extends BaseScraper {
     sha256: string,
     storageKey: string,
     byteSize: number,
+    mime = 'application/pdf',
   ): Promise<{ id: string; isNew: boolean }> {
     const [inserted] = await db
       .insert(documents)
       .values({
         sha256,
         storage_uri: storageKey,
-        mime_type: 'application/pdf',
+        mime_type: mime,
         byte_size: byteSize,
         first_seen_at: new Date(),
       })

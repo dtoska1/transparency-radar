@@ -9,7 +9,7 @@ import {
   vendim_documents,
   vendime,
 } from '@tra/db';
-import { LocalDiskAdapter } from '@tra/shared';
+import { LocalDiskAdapter, deriveDocFormat } from '@tra/shared';
 import * as cheerio from 'cheerio';
 import { and, desc, eq } from 'drizzle-orm';
 import pdfParse from 'pdf-parse/lib/pdf-parse.js';
@@ -370,11 +370,15 @@ export class PogradecVendimeScraper extends BaseScraper {
     const sha256 = createHash('sha256').update(buffer).digest('hex');
 
     // Storage (key = hash-derived, never remote filename)
-    const storageKey = `pogradec/vendime/${sha256}.pdf`;
-    await this.storage.upload(storageKey, buffer, 'application/pdf');
+    const { ext, mime } = deriveDocFormat(pdfUrl);
+    if (ext === 'bin') {
+      this.logger.warn({ url: pdfUrl }, 'unknown document format — storing as .bin');
+    }
+    const storageKey = `pogradec/vendime/${sha256}.${ext}`;
+    await this.storage.upload(storageKey, buffer, mime);
 
     // Document dedup + version
-    const doc = await this.upsertDocument(sha256, storageKey, buffer.length);
+    const doc = await this.upsertDocument(sha256, storageKey, buffer.length, mime);
     if (doc.isNew) {
       void stampDocument(doc.id, sha256, this.logger);
     }
@@ -419,13 +423,14 @@ export class PogradecVendimeScraper extends BaseScraper {
     sha256: string,
     storageKey: string,
     byteSize: number,
+    mime = 'application/pdf',
   ): Promise<{ id: string; isNew: boolean }> {
     const [inserted] = await db
       .insert(documents)
       .values({
         sha256,
         storage_uri: storageKey,
-        mime_type: 'application/pdf',
+        mime_type: mime,
         byte_size: byteSize,
         first_seen_at: new Date(),
       })
