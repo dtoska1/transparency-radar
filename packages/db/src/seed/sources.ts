@@ -35,9 +35,11 @@ const SOURCE_DEFINITIONS: SourceDef[] = [
   {
     slug: 'tirana',
     vertical: 'prokurime',
-    source_origin: 'app.gov.al',
-    source_page_url: 'https://app.gov.al/njoftimi-i-kontratës-së-shpallur',
-    notes: "Filter: Autoriteti Kontraktor = 'Bashkia Tiranë'",
+    source_origin: 'openprocurement.al',
+    source_page_url: 'https://openprocurement.al/en/tender/list/inst_id/20',
+    is_unofficial_proxy: true,
+    notes:
+      'AIS / Open Data Albania aggregator; open-data licensed; permission obtained. inst_id=20 confirmed from dropdown.',
   },
   // ── Shkodër ───────────────────────────────────────────────────────────────
   {
@@ -59,9 +61,11 @@ const SOURCE_DEFINITIONS: SourceDef[] = [
   {
     slug: 'shkoder',
     vertical: 'prokurime',
-    source_origin: 'app.gov.al',
-    source_page_url: 'https://app.gov.al/njoftimi-i-kontratës-së-shpallur',
-    notes: "Filter: 'Bashkia Shkodër'",
+    source_origin: 'openprocurement.al',
+    source_page_url: 'https://openprocurement.al/en/tender/list/inst_id/2',
+    is_unofficial_proxy: true,
+    notes:
+      'AIS / Open Data Albania aggregator; open-data licensed; permission obtained. inst_id=2 confirmed from dropdown.',
   },
   // ── Durrës ────────────────────────────────────────────────────────────────
   {
@@ -81,9 +85,11 @@ const SOURCE_DEFINITIONS: SourceDef[] = [
   {
     slug: 'durres',
     vertical: 'prokurime',
-    source_origin: 'app.gov.al',
-    source_page_url: 'https://app.gov.al/njoftimi-i-kontratës-së-shpallur',
-    notes: "Filter: 'Bashkia Durrës'",
+    source_origin: 'openprocurement.al',
+    source_page_url: 'https://openprocurement.al/en/tender/list/inst_id/16',
+    is_unofficial_proxy: true,
+    notes:
+      'AIS / Open Data Albania aggregator; open-data licensed; permission obtained. inst_id=16 confirmed from dropdown.',
   },
   // ── Vlorë ─────────────────────────────────────────────────────────────────
   {
@@ -108,9 +114,11 @@ const SOURCE_DEFINITIONS: SourceDef[] = [
   {
     slug: 'vlore',
     vertical: 'prokurime',
-    source_origin: 'app.gov.al',
-    source_page_url: 'https://app.gov.al/njoftimi-i-kontratës-së-shpallur',
-    notes: "Filter: 'Bashkia Vlorë'",
+    source_origin: 'openprocurement.al',
+    source_page_url: 'https://openprocurement.al/en/tender/list/inst_id/50',
+    is_unofficial_proxy: true,
+    notes:
+      'AIS / Open Data Albania aggregator; open-data licensed; permission obtained. inst_id=50 confirmed from dropdown.',
   },
   // ── Pogradec ──────────────────────────────────────────────────────────────
   {
@@ -134,9 +142,11 @@ const SOURCE_DEFINITIONS: SourceDef[] = [
   {
     slug: 'pogradec',
     vertical: 'prokurime',
-    source_origin: 'app.gov.al',
-    source_page_url: 'https://app.gov.al/njoftimi-i-kontratës-së-shpallur',
-    notes: "Filter: 'Bashkia Pogradec'",
+    source_origin: 'openprocurement.al',
+    source_page_url: 'https://openprocurement.al/en/tender/list/inst_id/31',
+    is_unofficial_proxy: true,
+    notes:
+      'AIS / Open Data Albania aggregator; open-data licensed; permission obtained. inst_id=31 confirmed from dropdown.',
   },
 ];
 
