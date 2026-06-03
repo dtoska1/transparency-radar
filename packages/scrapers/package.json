@@ -18,6 +18,7 @@
     "@tra/db": "workspace:*",
     "@tra/shared": "workspace:*",
     "cheerio": "^1.0.0",
+    "csv-parse": "^6.2.1",
     "drizzle-orm": "^0.38.3",
     "inngest": "^3.29.0",
     "pdf-parse": "^1.1.1",
