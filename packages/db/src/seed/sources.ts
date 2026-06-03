@@ -14,8 +14,10 @@ type SourceDef = {
   notes?: string;
 };
 
-// Verified May 2026 content audit — 5 municipalities × 3 verticals = 15 sources.
-// APP rows share source_origin; contracting-authority filter string lives in notes.
+const APP_PROKURIME_PAGE_URL = 'https://app.gov.al/eksportimi-i-procedurave-te-publikuara/';
+
+// Verified May 2026 content audit — 5 municipalities × 3 base verticals plus APP prokurime sources.
+// APP source rows use the official nationwide export; municipality matching happens in the importer.
 const SOURCE_DEFINITIONS: SourceDef[] = [
   // ── Tiranë ────────────────────────────────────────────────────────────────
   {
@@ -40,6 +42,14 @@ const SOURCE_DEFINITIONS: SourceDef[] = [
     is_unofficial_proxy: true,
     notes:
       'AIS / Open Data Albania aggregator; open-data licensed; permission obtained. inst_id=20 confirmed from dropdown.',
+  },
+  {
+    slug: 'tirana',
+    vertical: 'prokurime',
+    source_origin: 'app.gov.al',
+    source_page_url: APP_PROKURIME_PAGE_URL,
+    is_unofficial_proxy: false,
+    notes: 'Official APP procurement export; rows filtered to municipality by authority matcher.',
   },
   // ── Shkodër ───────────────────────────────────────────────────────────────
   {
@@ -67,6 +77,14 @@ const SOURCE_DEFINITIONS: SourceDef[] = [
     notes:
       'AIS / Open Data Albania aggregator; open-data licensed; permission obtained. inst_id=2 confirmed from dropdown.',
   },
+  {
+    slug: 'shkoder',
+    vertical: 'prokurime',
+    source_origin: 'app.gov.al',
+    source_page_url: APP_PROKURIME_PAGE_URL,
+    is_unofficial_proxy: false,
+    notes: 'Official APP procurement export; rows filtered to municipality by authority matcher.',
+  },
   // ── Durrës ────────────────────────────────────────────────────────────────
   {
     slug: 'durres',
@@ -90,6 +108,14 @@ const SOURCE_DEFINITIONS: SourceDef[] = [
     is_unofficial_proxy: true,
     notes:
       'AIS / Open Data Albania aggregator; open-data licensed; permission obtained. inst_id=16 confirmed from dropdown.',
+  },
+  {
+    slug: 'durres',
+    vertical: 'prokurime',
+    source_origin: 'app.gov.al',
+    source_page_url: APP_PROKURIME_PAGE_URL,
+    is_unofficial_proxy: false,
+    notes: 'Official APP procurement export; rows filtered to municipality by authority matcher.',
   },
   // ── Vlorë ─────────────────────────────────────────────────────────────────
   {
@@ -120,6 +146,14 @@ const SOURCE_DEFINITIONS: SourceDef[] = [
     notes:
       'AIS / Open Data Albania aggregator; open-data licensed; permission obtained. inst_id=50 confirmed from dropdown.',
   },
+  {
+    slug: 'vlore',
+    vertical: 'prokurime',
+    source_origin: 'app.gov.al',
+    source_page_url: APP_PROKURIME_PAGE_URL,
+    is_unofficial_proxy: false,
+    notes: 'Official APP procurement export; rows filtered to municipality by authority matcher.',
+  },
   // ── Pogradec ──────────────────────────────────────────────────────────────
   {
     // Per-meeting PDF bundles; decision numbers inside PDFs — Brief #3 target
@@ -148,6 +182,14 @@ const SOURCE_DEFINITIONS: SourceDef[] = [
     notes:
       'AIS / Open Data Albania aggregator; open-data licensed; permission obtained. inst_id=31 confirmed from dropdown.',
   },
+  {
+    slug: 'pogradec',
+    vertical: 'prokurime',
+    source_origin: 'app.gov.al',
+    source_page_url: APP_PROKURIME_PAGE_URL,
+    is_unofficial_proxy: false,
+    notes: 'Official APP procurement export; rows filtered to municipality by authority matcher.',
+  },
 ];
 
 async function seed() {
@@ -157,9 +199,15 @@ async function seed() {
   const muniMap = new Map(muniRows.map((m) => [m.slug, m.id]));
 
   const existingRows = await db
-    .select({ municipality_id: sources.municipality_id, vertical: sources.vertical })
+    .select({
+      municipality_id: sources.municipality_id,
+      vertical: sources.vertical,
+      source_origin: sources.source_origin,
+    })
     .from(sources);
-  const existingSet = new Set(existingRows.map((r) => `${r.municipality_id}:${r.vertical}`));
+  const existingSet = new Set(
+    existingRows.map((r) => `${r.municipality_id}:${r.vertical}:${r.source_origin}`),
+  );
 
   const toInsert: (typeof sources.$inferInsert)[] = [];
 
@@ -169,7 +217,7 @@ async function seed() {
       console.warn(`Municipality not found for slug: ${def.slug} — run municipalities seed first`);
       continue;
     }
-    if (existingSet.has(`${municipality_id}:${def.vertical}`)) continue;
+    if (existingSet.has(`${municipality_id}:${def.vertical}:${def.source_origin}`)) continue;
 
     toInsert.push({
       municipality_id,
