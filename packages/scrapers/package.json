@@ -11,7 +11,8 @@
     "run:shkoder:vendime": "tsx src/shkoder/run.ts",
     "run:durres:vendime": "tsx src/durres/run.ts",
     "run:tirana:vendime": "tsx src/tirana/run.ts",
-    "run:vlore:vendime": "tsx src/vlore/run.ts"
+    "run:vlore:vendime": "tsx src/vlore/run.ts",
+    "run:prokurime": "tsx src/prokurime/run.ts"
   },
   "dependencies": {
     "@tra/db": "workspace:*",
