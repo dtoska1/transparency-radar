@@ -1,11 +1,11 @@
 import { db } from '@tra/db';
-import { audit_log, konsultime, municipalities, vendime } from '@tra/db';
+import { audit_log, konsultime, municipalities, prokurime, vendime } from '@tra/db';
 import { MUNICIPALITY_SLUGS } from '@tra/shared';
 import { and, eq, inArray, notLike, sql } from 'drizzle-orm';
 import type { RequestHandler } from 'express';
 import { z } from 'zod';
 
-const ManualVerticalSchema = z.enum(['vendime', 'konsultime'] as const);
+const ManualVerticalSchema = z.enum(['vendime', 'konsultime', 'prokurime'] as const);
 
 const BulkApproveSchema = z.object({
   municipality: z.enum(MUNICIPALITY_SLUGS),
@@ -18,7 +18,7 @@ export const handleBulkApprove: RequestHandler = async (req, res) => {
   // 1. Validate vertical
   const verticalParse = ManualVerticalSchema.safeParse(req.params.vertical);
   if (!verticalParse.success) {
-    res.status(400).json({ error: 'Invalid vertical — must be vendime or konsultime' });
+    res.status(400).json({ error: 'Invalid vertical — must be vendime, konsultime, or prokurime' });
     return;
   }
   const vertical = verticalParse.data;
@@ -90,23 +90,78 @@ export const handleBulkApprove: RequestHandler = async (req, res) => {
     return;
   }
 
-  // konsultime
+  if (vertical === 'konsultime') {
+    const conditions = [
+      eq(konsultime.review_status, 'pending'),
+      eq(konsultime.municipality_id, muni.id),
+    ];
+    if (year !== undefined)
+      conditions.push(sql`EXTRACT(YEAR FROM ${konsultime.published_date})::int = ${year}`);
+    if (excludePlaceholders) conditions.push(notLike(konsultime.dedup_key, '%PLACEHOLDER%'));
+
+    if (dryRun) {
+      const [{ count }] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(konsultime)
+        .where(and(...conditions));
+      const sample = await db
+        .select({ dedup_key: konsultime.dedup_key })
+        .from(konsultime)
+        .where(and(...conditions))
+        .limit(10);
+      res.json({ dryRun: true, wouldApprove: count, sample: sample.map((r) => r.dedup_key) });
+      return;
+    }
+
+    const approved = await db.transaction(async (tx) => {
+      const rows = await tx
+        .select({ id: konsultime.id })
+        .from(konsultime)
+        .where(and(...conditions));
+
+      if (rows.length === 0) return 0;
+
+      const ids = rows.map((r) => r.id);
+      await tx
+        .update(konsultime)
+        .set({ review_status: 'approved' })
+        .where(inArray(konsultime.id, ids));
+
+      const payload = { filter: { municipality, year, excludePlaceholders } };
+      await tx.insert(audit_log).values(
+        ids.map((id) => ({
+          action: 'bulk_approve',
+          table_name: vertical,
+          record_id: id,
+          actor_id: 'admin',
+          payload,
+        })),
+      );
+
+      return rows.length;
+    });
+
+    res.json({ approved });
+    return;
+  }
+
+  // prokurime
   const conditions = [
-    eq(konsultime.review_status, 'pending'),
-    eq(konsultime.municipality_id, muni.id),
+    eq(prokurime.review_status, 'pending'),
+    eq(prokurime.municipality_id, muni.id),
   ];
   if (year !== undefined)
-    conditions.push(sql`EXTRACT(YEAR FROM ${konsultime.published_date})::int = ${year}`);
-  if (excludePlaceholders) conditions.push(notLike(konsultime.dedup_key, '%PLACEHOLDER%'));
+    conditions.push(sql`EXTRACT(YEAR FROM ${prokurime.published_date})::int = ${year}`);
+  if (excludePlaceholders) conditions.push(notLike(prokurime.dedup_key, '%PLACEHOLDER%'));
 
   if (dryRun) {
     const [{ count }] = await db
       .select({ count: sql<number>`count(*)::int` })
-      .from(konsultime)
+      .from(prokurime)
       .where(and(...conditions));
     const sample = await db
-      .select({ dedup_key: konsultime.dedup_key })
-      .from(konsultime)
+      .select({ dedup_key: prokurime.dedup_key })
+      .from(prokurime)
       .where(and(...conditions))
       .limit(10);
     res.json({ dryRun: true, wouldApprove: count, sample: sample.map((r) => r.dedup_key) });
@@ -115,17 +170,14 @@ export const handleBulkApprove: RequestHandler = async (req, res) => {
 
   const approved = await db.transaction(async (tx) => {
     const rows = await tx
-      .select({ id: konsultime.id })
-      .from(konsultime)
+      .select({ id: prokurime.id })
+      .from(prokurime)
       .where(and(...conditions));
 
     if (rows.length === 0) return 0;
 
     const ids = rows.map((r) => r.id);
-    await tx
-      .update(konsultime)
-      .set({ review_status: 'approved' })
-      .where(inArray(konsultime.id, ids));
+    await tx.update(prokurime).set({ review_status: 'approved' }).where(inArray(prokurime.id, ids));
 
     const payload = { filter: { municipality, year, excludePlaceholders } };
     await tx.insert(audit_log).values(
