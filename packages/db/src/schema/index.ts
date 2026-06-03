@@ -19,10 +19,12 @@ import {
 
 // Values must stay in sync with VERTICALS in @tra/shared
 export const verticalEnum = pgEnum('vertical', ['vendime', 'konsultime', 'prokurime']);
-// Compile-time guard: this line fails if verticalEnum values diverge from @tra/shared's Vertical type
-export type _VerticalSync = (typeof verticalEnum.enumValues)[number] extends Vertical
-  ? true
-  : never;
+// Compile-time guard: fails typecheck if the `vertical` pgEnum values and
+// @tra/shared's VERTICALS diverge in either direction. Exported (not a bare
+// local) so it survives noUnusedLocals; resolves to `never` on drift, which
+// then rejects the `true` assignment.
+type _AssertEqual<A, B> = [A] extends [B] ? ([B] extends [A] ? true : never) : never;
+export const _verticalSync: _AssertEqual<(typeof verticalEnum.enumValues)[number], Vertical> = true;
 export const reviewStatusEnum = pgEnum('review_status', ['pending', 'approved', 'rejected']);
 export const konsultimeKindEnum = pgEnum('konsultime_kind', [
   'consultation_notice',
@@ -120,7 +122,7 @@ export const vendime = pgTable(
     year_signed: integer('year_signed').notNull(),
     title: text('title').notNull(),
     summary: text('summary'),
-    published_date: date('published_date').notNull(),
+    published_date: date('published_date', { mode: 'string' }).notNull(),
     review_status: reviewStatusEnum('review_status').notNull().default('pending'),
     is_unofficial_proxy: boolean('is_unofficial_proxy').notNull().default(false),
     collected_at: timestamp('collected_at', { withTimezone: true }).notNull(),
@@ -153,7 +155,7 @@ export const konsultime = pgTable(
     title: text('title').notNull(),
     title_slug: text('title_slug').notNull(),
     summary: text('summary'),
-    published_date: date('published_date').notNull(),
+    published_date: date('published_date', { mode: 'string' }).notNull(),
     // kind distinguishes draft acts / projektakte from open consultations
     kind: konsultimeKindEnum('kind').notNull().default('consultation_notice'),
     review_status: reviewStatusEnum('review_status').notNull().default('pending'),
@@ -189,7 +191,7 @@ export const prokurime = pgTable(
     title: text('title').notNull(),
     contracting_authority: text('contracting_authority').notNull(),
     procurement_object: text('procurement_object').notNull(),
-    published_date: date('published_date').notNull(),
+    published_date: date('published_date', { mode: 'string' }).notNull(),
     review_status: reviewStatusEnum('review_status').notNull().default('pending'),
     is_unofficial_proxy: boolean('is_unofficial_proxy').notNull().default(false),
     collected_at: timestamp('collected_at', { withTimezone: true }).notNull(),
