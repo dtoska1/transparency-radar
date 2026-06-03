@@ -37,15 +37,6 @@ const SOURCE_DEFINITIONS: SourceDef[] = [
   {
     slug: 'tirana',
     vertical: 'prokurime',
-    source_origin: 'openprocurement.al',
-    source_page_url: 'https://openprocurement.al/en/tender/list/inst_id/20',
-    is_unofficial_proxy: true,
-    notes:
-      'AIS / Open Data Albania aggregator; open-data licensed; permission obtained. inst_id=20 confirmed from dropdown.',
-  },
-  {
-    slug: 'tirana',
-    vertical: 'prokurime',
     source_origin: 'app.gov.al',
     source_page_url: APP_PROKURIME_PAGE_URL,
     is_unofficial_proxy: false,
@@ -71,15 +62,6 @@ const SOURCE_DEFINITIONS: SourceDef[] = [
   {
     slug: 'shkoder',
     vertical: 'prokurime',
-    source_origin: 'openprocurement.al',
-    source_page_url: 'https://openprocurement.al/en/tender/list/inst_id/2',
-    is_unofficial_proxy: true,
-    notes:
-      'AIS / Open Data Albania aggregator; open-data licensed; permission obtained. inst_id=2 confirmed from dropdown.',
-  },
-  {
-    slug: 'shkoder',
-    vertical: 'prokurime',
     source_origin: 'app.gov.al',
     source_page_url: APP_PROKURIME_PAGE_URL,
     is_unofficial_proxy: false,
@@ -99,15 +81,6 @@ const SOURCE_DEFINITIONS: SourceDef[] = [
     source_origin: 'durres.gov.al',
     source_page_url: 'https://durres.gov.al/konsultimet-publike',
     notes: 'Also covers projekt-akte register — confirm latest-published date before enabling',
-  },
-  {
-    slug: 'durres',
-    vertical: 'prokurime',
-    source_origin: 'openprocurement.al',
-    source_page_url: 'https://openprocurement.al/en/tender/list/inst_id/16',
-    is_unofficial_proxy: true,
-    notes:
-      'AIS / Open Data Albania aggregator; open-data licensed; permission obtained. inst_id=16 confirmed from dropdown.',
   },
   {
     slug: 'durres',
@@ -140,15 +113,6 @@ const SOURCE_DEFINITIONS: SourceDef[] = [
   {
     slug: 'vlore',
     vertical: 'prokurime',
-    source_origin: 'openprocurement.al',
-    source_page_url: 'https://openprocurement.al/en/tender/list/inst_id/50',
-    is_unofficial_proxy: true,
-    notes:
-      'AIS / Open Data Albania aggregator; open-data licensed; permission obtained. inst_id=50 confirmed from dropdown.',
-  },
-  {
-    slug: 'vlore',
-    vertical: 'prokurime',
     source_origin: 'app.gov.al',
     source_page_url: APP_PROKURIME_PAGE_URL,
     is_unofficial_proxy: false,
@@ -172,15 +136,6 @@ const SOURCE_DEFINITIONS: SourceDef[] = [
       'https://bashkiapogradec.gov.al/publikime-kategori/njoftime-te-keshillit-bashkiak-12',
     notes:
       'Council notices listing — filter by keyword "konsultim publik"; exclude dead Bashkitë e Forta link',
-  },
-  {
-    slug: 'pogradec',
-    vertical: 'prokurime',
-    source_origin: 'openprocurement.al',
-    source_page_url: 'https://openprocurement.al/en/tender/list/inst_id/31',
-    is_unofficial_proxy: true,
-    notes:
-      'AIS / Open Data Albania aggregator; open-data licensed; permission obtained. inst_id=31 confirmed from dropdown.',
   },
   {
     slug: 'pogradec',
