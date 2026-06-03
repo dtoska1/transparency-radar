@@ -19,7 +19,7 @@ import {
   normalizeText,
 } from '@tra/shared';
 import { parse } from 'csv-parse/sync';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import pino from 'pino';
 import { fetch } from 'undici';
 
@@ -763,23 +763,6 @@ export class AppOfficialProkurimeImporter {
   }
 
   private async printCoverageReport(coverage: CoverageReport): Promise<void> {
-    const openprocurementRows = await db
-      .select({
-        slug: municipalities.slug,
-        count: sql<number>`count(*)::int`,
-      })
-      .from(prokurime)
-      .innerJoin(municipalities, eq(prokurime.municipality_id, municipalities.id))
-      .where(eq(prokurime.source_origin, 'openprocurement.al'))
-      .groupBy(municipalities.slug);
-
-    const openprocurementCounts = Object.fromEntries(
-      MUNICIPALITY_SLUGS.map((slug) => [
-        slug,
-        openprocurementRows.find((row) => row.slug === slug)?.count ?? 0,
-      ]),
-    );
-
     const matchedByMunicipalityYear = Object.fromEntries(
       MUNICIPALITY_SLUGS.map((slug) => [
         slug,
@@ -808,7 +791,6 @@ export class AppOfficialProkurimeImporter {
         totalDocumentsCreated: coverage.totalDocumentsCreated,
         totalDocumentVersionsCreated: coverage.totalDocumentVersionsCreated,
         invalidMatchedRows: coverage.invalidMatchedRows,
-        openprocurementCounts,
         matchedAuthoritySamples: coverage.matchedAuthoritySamples,
         rejectedBashkiaAuthoritySamples: coverage.rejectedBashkiaAuthoritySamples,
       },
