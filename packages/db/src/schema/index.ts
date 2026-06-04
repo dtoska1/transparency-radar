@@ -64,6 +64,25 @@ export const sources = pgTable('sources', {
   created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// ── Admin auth ────────────────────────────────────────────────────────────────
+
+export const admin_users = pgTable('admin_users', {
+  id: text('id').primaryKey(),
+  email: text('email').notNull().unique(),
+  password_hash: text('password_hash').notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  disabled_at: timestamp('disabled_at', { withTimezone: true }),
+});
+
+export const admin_sessions = pgTable('admin_sessions', {
+  id: text('id').primaryKey(),
+  user_id: text('user_id')
+    .notNull()
+    .references(() => admin_users.id),
+  expires_at: timestamp('expires_at', { withTimezone: true }).notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ── Tamper-evidence tables ────────────────────────────────────────────────────
 
 export const documents = pgTable('documents', {
