@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@node-rs/argon2": "^2.0.2",
     "@sentry/node": "^8.47.0",
     "@tra/db": "workspace:*",
     "@tra/shared": "workspace:*",
