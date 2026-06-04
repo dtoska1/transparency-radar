@@ -10,6 +10,7 @@ import { inngest } from './inngest.js';
 import { logger } from './logger.js';
 import { requireAdmin } from './middleware/requireAdmin.js';
 import { adminRouter } from './routes/admin.js';
+import { createAdminAuthRouter } from './routes/adminAuth.js';
 import { publicRouter } from './routes/public.js';
 
 // Default-deny: if CORS_ORIGINS is unset, allowedOrigins is empty and all origins are blocked.
@@ -25,6 +26,13 @@ const publicLimiter = rateLimit({
 const adminLimiter = rateLimit({
   windowMs: 60_000,
   max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const adminAuthLimiter = rateLimit({
+  windowMs: 60_000,
+  max: 5,
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -49,6 +57,7 @@ export function createApp(): Express {
 
   // Admin router first — must precede publicRouter to prevent GET /:vertical
   // from capturing /api/admin/* as vertical='admin'.
+  app.use('/api/admin/auth', adminAuthLimiter, createAdminAuthRouter());
   app.use('/api/admin', adminLimiter, requireAdmin, adminRouter);
 
   app.use('/api', publicLimiter, publicRouter);
