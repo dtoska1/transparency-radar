@@ -83,6 +83,10 @@ describe('create-admin script helpers', () => {
       email: 'admin@example.com',
       reset: false,
     });
+    expect(parseCreateAdminArgs(['--', '--email', 'Admin@Example.COM'])).toEqual({
+      email: 'admin@example.com',
+      reset: false,
+    });
   });
 
   it('rejects non-local database URLs', () => {

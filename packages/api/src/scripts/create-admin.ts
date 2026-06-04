@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { stdin, stdout } from 'node:process';
-import readline from 'node:readline/promises';
+import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import { type Options, hash } from '@node-rs/argon2';
 import { admin_users, db } from '@tra/db';
@@ -25,6 +25,7 @@ export type CreateAdminResult = 'created' | 'reset' | 'exists';
 
 interface HiddenPrompt {
   _writeToOutput(input: string): void;
+  question(query: string, callback: (answer: string) => void): void;
 }
 
 export function normalizeEmail(email: string): string {
@@ -37,6 +38,9 @@ export function parseCreateAdminArgs(argv: string[]): CreateAdminArgs {
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
+    if (arg === '--') {
+      continue;
+    }
     if (arg === '--reset') {
       reset = true;
       continue;
@@ -91,9 +95,12 @@ async function promptHidden(label: string): Promise<string> {
   const hidden = rl as unknown as HiddenPrompt;
   const originalWrite = hidden._writeToOutput.bind(rl);
   hidden._writeToOutput = () => {};
+  stdout.write(label);
 
   try {
-    return await rl.question(label);
+    return await new Promise<string>((resolve) => {
+      hidden.question('', resolve);
+    });
   } finally {
     hidden._writeToOutput = originalWrite;
     rl.close();
@@ -163,8 +170,12 @@ async function main(argv: string[]): Promise<void> {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  main(process.argv.slice(2)).catch((err: unknown) => {
-    console.error(err instanceof Error ? err.message : err);
-    process.exit(1);
-  });
+  main(process.argv.slice(2))
+    .then(() => {
+      process.exit(0);
+    })
+    .catch((err: unknown) => {
+      console.error(err instanceof Error ? err.message : err);
+      process.exit(1);
+    });
 }
