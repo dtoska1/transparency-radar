@@ -12,7 +12,7 @@
       "**/node_modules/**",
       "**/*.tsbuildinfo",
       "**/drizzle/**",
-      "packages/admin/design reference/**"
+      "packages/admin/design-reference/**"
     ]
   },
   "formatter": {
