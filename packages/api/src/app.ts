@@ -8,7 +8,8 @@ import { pinoHttp } from 'pino-http';
 import { ZodError } from 'zod';
 import { inngest } from './inngest.js';
 import { logger } from './logger.js';
-import { requireAdmin } from './middleware/requireAdmin.js';
+import { adminOriginCheck } from './middleware/adminOrigin.js';
+import { requireAdminSession } from './middleware/requireAdminSession.js';
 import { adminRouter } from './routes/admin.js';
 import { createAdminAuthRouter } from './routes/adminAuth.js';
 import { publicRouter } from './routes/public.js';
@@ -47,7 +48,7 @@ export function createApp(): Express {
         // Allow requests without an Origin header (server-to-server, curl).
         if (!origin) return cb(null, false);
         if (allowedOrigins.includes(origin)) return cb(null, true);
-        cb(new Error('Not allowed by CORS'));
+        cb(null, false);
       },
       credentials: true,
     }),
@@ -58,7 +59,13 @@ export function createApp(): Express {
   // Admin router first — must precede publicRouter to prevent GET /:vertical
   // from capturing /api/admin/* as vertical='admin'.
   app.use('/api/admin/auth', adminAuthLimiter, createAdminAuthRouter());
-  app.use('/api/admin', adminLimiter, requireAdmin, adminRouter);
+  app.use(
+    '/api/admin',
+    adminLimiter,
+    adminOriginCheck(allowedOrigins),
+    requireAdminSession,
+    adminRouter,
+  );
 
   app.use('/api', publicLimiter, publicRouter);
 
