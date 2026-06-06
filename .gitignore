@@ -37,3 +37,6 @@ coverage/
 
 # Uploads (local storage)
 uploads/
+
+.mcp.json
+.claude/settings.local.json
