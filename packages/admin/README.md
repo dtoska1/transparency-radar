@@ -1,3 +1,7 @@
 # @tra/admin
 
-Admin panel placeholder. Will be set up as an Astro + HTMX app in a later task.
+Server-rendered admin panel built with Astro, HTMX, and Tailwind CSS.
+
+```bash
+pnpm --filter @tra/admin dev
+```
