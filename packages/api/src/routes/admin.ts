@@ -1,7 +1,19 @@
 import { db } from '@tra/db';
-import { audit_log, konsultime, municipalities, prokurime, vendime } from '@tra/db';
+import {
+  audit_log,
+  document_versions,
+  documents,
+  konsultim_documents,
+  konsultime,
+  municipalities,
+  prokurim_documents,
+  prokurime,
+  sources,
+  vendim_documents,
+  vendime,
+} from '@tra/db';
 import { MUNICIPALITY_SLUGS, VERTICALS, type Vertical } from '@tra/shared';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import type express from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
@@ -30,7 +42,7 @@ adminRouter.post('/:vertical', upload.single('file'), handleAdminCreate);
 // won't collide (different path depth), but explicit ordering makes intent clear.
 adminRouter.post('/:vertical/bulk-approve', handleBulkApprove);
 
-adminRouter.get('/pending', async (req, res) => {
+export async function handleListPending(req: express.Request, res: express.Response) {
   const parse = PendingQuerySchema.safeParse(req.query);
   if (!parse.success) {
     res.status(400).json({ error: 'Invalid query params', details: parse.error.flatten() });
@@ -40,7 +52,9 @@ adminRouter.get('/pending', async (req, res) => {
   const { vertical, municipality, limit, offset } = parse.data;
   const rows = await listPending(vertical, municipality, limit, offset);
   res.json({ data: rows, limit, offset });
-});
+}
+
+adminRouter.get('/pending', handleListPending);
 
 adminRouter.post('/:vertical/:id/approve', async (req, res) => {
   const verticalParse = VerticalSchema.safeParse(req.params.vertical);
@@ -134,9 +148,67 @@ async function listPendingVertical(
   }
 }
 
+function latestVendimDocument() {
+  return db
+    .selectDistinctOn([vendim_documents.vendim_id], {
+      item_id: vendim_documents.vendim_id,
+      sha256: documents.sha256,
+      tsr_timestamp_at: documents.tsr_timestamp_at,
+    })
+    .from(vendim_documents)
+    .innerJoin(document_versions, eq(document_versions.id, vendim_documents.document_version_id))
+    .innerJoin(documents, eq(documents.id, document_versions.document_id))
+    .orderBy(
+      vendim_documents.vendim_id,
+      desc(document_versions.created_at),
+      desc(document_versions.version_no),
+      desc(document_versions.id),
+    )
+    .as('latest_vendim_document');
+}
+
+function latestKonsultimDocument() {
+  return db
+    .selectDistinctOn([konsultim_documents.konsultim_id], {
+      item_id: konsultim_documents.konsultim_id,
+      sha256: documents.sha256,
+      tsr_timestamp_at: documents.tsr_timestamp_at,
+    })
+    .from(konsultim_documents)
+    .innerJoin(document_versions, eq(document_versions.id, konsultim_documents.document_version_id))
+    .innerJoin(documents, eq(documents.id, document_versions.document_id))
+    .orderBy(
+      konsultim_documents.konsultim_id,
+      desc(document_versions.created_at),
+      desc(document_versions.version_no),
+      desc(document_versions.id),
+    )
+    .as('latest_konsultim_document');
+}
+
+function latestProkurimDocument() {
+  return db
+    .selectDistinctOn([prokurim_documents.prokurim_id], {
+      item_id: prokurim_documents.prokurim_id,
+      sha256: documents.sha256,
+      tsr_timestamp_at: documents.tsr_timestamp_at,
+    })
+    .from(prokurim_documents)
+    .innerJoin(document_versions, eq(document_versions.id, prokurim_documents.document_version_id))
+    .innerJoin(documents, eq(documents.id, document_versions.document_id))
+    .orderBy(
+      prokurim_documents.prokurim_id,
+      desc(document_versions.created_at),
+      desc(document_versions.version_no),
+      desc(document_versions.id),
+    )
+    .as('latest_prokurim_document');
+}
+
 async function listPendingVendime(municipality: string | undefined, limit: number, offset: number) {
   const conditions = [eq(vendime.review_status, 'pending')];
   if (municipality) conditions.push(eq(municipalities.slug, municipality));
+  const latestDocument = latestVendimDocument();
 
   const rows = await db
     .select({
@@ -144,14 +216,22 @@ async function listPendingVendime(municipality: string | undefined, limit: numbe
       title: vendime.title,
       published_date: sql<string>`${vendime.published_date}::text`,
       municipality: municipalities.slug,
+      source_id: vendime.source_id,
       source_origin: vendime.source_origin,
+      source_page_url: vendime.source_page_url,
       source_url: vendime.source_url,
+      is_unofficial_proxy: sources.is_unofficial_proxy,
+      sha256: latestDocument.sha256,
+      tsr_timestamp_at: latestDocument.tsr_timestamp_at,
+      stamped: sql<boolean>`${latestDocument.sha256} is not null`,
       review_status: vendime.review_status,
       collected_at: vendime.collected_at,
       created_at: vendime.created_at,
     })
     .from(vendime)
     .innerJoin(municipalities, eq(vendime.municipality_id, municipalities.id))
+    .innerJoin(sources, eq(vendime.source_id, sources.id))
+    .leftJoin(latestDocument, eq(latestDocument.item_id, vendime.id))
     .where(and(...conditions))
     .limit(limit)
     .offset(offset);
@@ -166,6 +246,7 @@ async function listPendingKonsultime(
 ) {
   const conditions = [eq(konsultime.review_status, 'pending')];
   if (municipality) conditions.push(eq(municipalities.slug, municipality));
+  const latestDocument = latestKonsultimDocument();
 
   const rows = await db
     .select({
@@ -173,14 +254,22 @@ async function listPendingKonsultime(
       title: konsultime.title,
       published_date: sql<string>`${konsultime.published_date}::text`,
       municipality: municipalities.slug,
+      source_id: konsultime.source_id,
       source_origin: konsultime.source_origin,
+      source_page_url: konsultime.source_page_url,
       source_url: konsultime.source_url,
+      is_unofficial_proxy: sources.is_unofficial_proxy,
+      sha256: latestDocument.sha256,
+      tsr_timestamp_at: latestDocument.tsr_timestamp_at,
+      stamped: sql<boolean>`${latestDocument.sha256} is not null`,
       review_status: konsultime.review_status,
       collected_at: konsultime.collected_at,
       created_at: konsultime.created_at,
     })
     .from(konsultime)
     .innerJoin(municipalities, eq(konsultime.municipality_id, municipalities.id))
+    .innerJoin(sources, eq(konsultime.source_id, sources.id))
+    .leftJoin(latestDocument, eq(latestDocument.item_id, konsultime.id))
     .where(and(...conditions))
     .limit(limit)
     .offset(offset);
@@ -195,6 +284,7 @@ async function listPendingProkurime(
 ) {
   const conditions = [eq(prokurime.review_status, 'pending')];
   if (municipality) conditions.push(eq(municipalities.slug, municipality));
+  const latestDocument = latestProkurimDocument();
 
   const rows = await db
     .select({
@@ -202,14 +292,22 @@ async function listPendingProkurime(
       title: prokurime.title,
       published_date: sql<string>`${prokurime.published_date}::text`,
       municipality: municipalities.slug,
+      source_id: prokurime.source_id,
       source_origin: prokurime.source_origin,
+      source_page_url: prokurime.source_page_url,
       source_url: prokurime.source_url,
+      is_unofficial_proxy: sources.is_unofficial_proxy,
+      sha256: latestDocument.sha256,
+      tsr_timestamp_at: latestDocument.tsr_timestamp_at,
+      stamped: sql<boolean>`${latestDocument.sha256} is not null`,
       review_status: prokurime.review_status,
       collected_at: prokurime.collected_at,
       created_at: prokurime.created_at,
     })
     .from(prokurime)
     .innerJoin(municipalities, eq(prokurime.municipality_id, municipalities.id))
+    .innerJoin(sources, eq(prokurime.source_id, sources.id))
+    .leftJoin(latestDocument, eq(latestDocument.item_id, prokurime.id))
     .where(and(...conditions))
     .limit(limit)
     .offset(offset);
