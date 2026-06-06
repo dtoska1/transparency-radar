@@ -1,0 +1,46 @@
+---
+import { safeExternalUrl } from '../lib/reviewQueue';
+
+interface Props {
+  isUnofficialProxy: boolean;
+  origin: string;
+  pageUrl: string;
+}
+
+const { isUnofficialProxy, origin, pageUrl } = Astro.props;
+const safePageUrl = safeExternalUrl(pageUrl);
+---
+
+<div class="min-w-34">
+  <span
+    class:list={[
+      'inline-flex items-center gap-1.5 border px-2 py-1 text-[11px] font-semibold',
+      isUnofficialProxy
+        ? 'border-amber-200 bg-amber-50 text-amber-800'
+        : 'border-slate-200 bg-slate-50 text-slate-700',
+    ]}
+  >
+    <span
+      class:list={['size-1.5 rounded-full', isUnofficialProxy ? 'bg-amber-500' : 'bg-emerald-600']}
+      aria-hidden="true"
+    ></span>
+    {isUnofficialProxy ? 'Unofficial proxy' : 'Official'}
+  </span>
+  {
+    safePageUrl ? (
+      <a
+        class="mt-1.5 block max-w-44 truncate text-[11px] text-slate-500 underline decoration-slate-300 underline-offset-2 hover:text-navy-700"
+        href={safePageUrl}
+        target="_blank"
+        rel="noreferrer"
+        title={origin}
+      >
+        {origin}
+      </a>
+    ) : (
+      <span class="mt-1.5 block max-w-44 truncate text-[11px] text-slate-500" title={origin}>
+        {origin}
+      </span>
+    )
+  }
+</div>

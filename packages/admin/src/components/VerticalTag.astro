@@ -1,0 +1,19 @@
+---
+import { type Vertical, verticalLabel } from '../lib/reviewQueue';
+
+interface Props {
+  vertical: Vertical;
+}
+
+const { vertical } = Astro.props;
+const colors: Record<Vertical, string> = {
+  vendime: 'bg-blue-600',
+  konsultime: 'bg-emerald-600',
+  prokurime: 'bg-violet-600',
+};
+---
+
+<span class="inline-flex items-center gap-2 whitespace-nowrap text-xs font-medium text-slate-700">
+  <span class:list={['size-2', colors[vertical]]} aria-hidden="true"></span>
+  {verticalLabel(vertical)}
+</span>

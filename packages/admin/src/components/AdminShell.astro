@@ -1,0 +1,62 @@
+---
+interface Props {
+  pendingCount: number;
+}
+
+const { pendingCount } = Astro.props;
+---
+
+<div class="min-h-screen bg-surface lg:flex">
+  <aside
+    class="border-b border-slate-200 bg-white lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-60 lg:flex-none lg:flex-col lg:border-r lg:border-b-0"
+  >
+    <div class="flex items-center gap-3 border-b border-slate-200 px-5 py-4">
+      <div
+        class="grid size-8 place-items-center bg-navy-800 text-xs font-bold text-white"
+        aria-hidden="true"
+      >
+        RV
+      </div>
+      <div class="min-w-0">
+        <p class="truncate text-sm font-semibold text-navy-950">Radari Vendor</p>
+        <p class="truncate text-[11px] text-slate-500">Transparency Radar · AL</p>
+      </div>
+    </div>
+
+    <div class="flex items-center gap-3 px-4 py-3 lg:block lg:flex-1 lg:px-3">
+      <p class="hidden px-2 pt-3 pb-2 text-[10px] font-semibold uppercase text-slate-400 lg:block">
+        Operations
+      </p>
+      <a
+        class="flex flex-1 items-center gap-2 bg-blue-50 px-3 py-2 text-sm font-semibold text-navy-800 lg:w-full"
+        href="/"
+        aria-current="page"
+      >
+        <span class="size-2 bg-navy-700" aria-hidden="true"></span>
+        <span>Review Queue</span>
+        <span class="ml-auto bg-navy-800 px-2 py-0.5 font-mono text-[11px] text-white">
+          {pendingCount}
+        </span>
+      </a>
+    </div>
+
+    <form class="ml-auto px-4 py-3 lg:mt-auto lg:ml-0 lg:border-t lg:border-slate-200" method="post" action="/api/logout">
+      <button
+        class="border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 lg:w-full"
+        type="submit"
+      >
+        Sign out
+      </button>
+    </form>
+  </aside>
+
+  <div class="min-w-0 flex-1">
+    <header class="flex h-13 items-center border-b border-slate-200 bg-white px-5 lg:px-7">
+      <p class="text-sm text-slate-500">Operations <span class="px-2 text-slate-300">/</span> <b class="font-semibold text-slate-800">Review Queue</b></p>
+      <span class="ml-auto border border-amber-200 bg-amber-50 px-2 py-1 font-mono text-[10px] font-semibold uppercase text-amber-800">
+        DEV
+      </span>
+    </header>
+    <slot />
+  </div>
+</div>

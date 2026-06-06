@@ -1,0 +1,113 @@
+---
+import {
+  type PendingRow,
+  formatPublishedDate,
+  municipalityLabel,
+  safeExternalUrl,
+  shortId,
+} from '../lib/reviewQueue';
+import SourceBadge from './SourceBadge.astro';
+import TamperCell from './TamperCell.astro';
+import VerticalTag from './VerticalTag.astro';
+
+interface Props {
+  rows: PendingRow[];
+}
+
+const { rows } = Astro.props;
+---
+
+{
+  rows.length > 0 ? (
+    <div class="overflow-hidden border border-slate-200 bg-white shadow-sm">
+      <div class="overflow-x-auto">
+        <table class="min-w-[1120px] w-full border-separate border-spacing-0 text-left text-sm">
+          <thead>
+            <tr class="bg-slate-50">
+              <th class="border-b border-slate-200 px-4 py-3 text-[10px] font-semibold uppercase text-slate-500">
+                Document
+              </th>
+              <th class="border-b border-slate-200 px-4 py-3 text-[10px] font-semibold uppercase text-slate-500">
+                Municipality
+              </th>
+              <th class="border-b border-slate-200 px-4 py-3 text-[10px] font-semibold uppercase text-slate-500">
+                Vertical
+              </th>
+              <th class="border-b border-slate-200 px-4 py-3 text-[10px] font-semibold uppercase text-slate-500">
+                Published
+              </th>
+              <th class="border-b border-slate-200 px-4 py-3 text-[10px] font-semibold uppercase text-slate-500">
+                Source
+              </th>
+              <th class="border-b border-slate-200 px-4 py-3 text-[10px] font-semibold uppercase text-slate-500">
+                Tamper-evidence
+              </th>
+              <th class="border-b border-slate-200 px-4 py-3 text-[10px] font-semibold uppercase text-slate-500">
+                Status
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => {
+              const safeSourceUrl = safeExternalUrl(row.source_url);
+              return (
+                <tr class="group hover:bg-slate-50">
+                  <td class="max-w-md border-b border-slate-100 px-4 py-3.5 align-middle">
+                    {safeSourceUrl ? (
+                      <a
+                        class="line-clamp-2 font-semibold leading-5 text-slate-900 hover:text-navy-700 hover:underline hover:underline-offset-2"
+                        href={safeSourceUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {row.title}
+                      </a>
+                    ) : (
+                      <p class="line-clamp-2 font-semibold leading-5 text-slate-900">{row.title}</p>
+                    )}
+                    <p class="mt-1 font-mono text-[11px] text-slate-400" title={row.id}>
+                      {shortId(row.id)}
+                    </p>
+                  </td>
+                  <td class="border-b border-slate-100 px-4 py-3.5 font-medium whitespace-nowrap text-slate-700">
+                    {municipalityLabel(row.municipality)}
+                  </td>
+                  <td class="border-b border-slate-100 px-4 py-3.5">
+                    <VerticalTag vertical={row.vertical} />
+                  </td>
+                  <td class="border-b border-slate-100 px-4 py-3.5 font-mono text-xs whitespace-nowrap text-slate-600">
+                    {formatPublishedDate(row.published_date)}
+                  </td>
+                  <td class="border-b border-slate-100 px-4 py-3.5">
+                    <SourceBadge
+                      isUnofficialProxy={row.is_unofficial_proxy}
+                      origin={row.source_origin}
+                      pageUrl={row.source_page_url}
+                    />
+                  </td>
+                  <td class="border-b border-slate-100 px-4 py-3.5">
+                    <TamperCell row={row} />
+                  </td>
+                  <td class="border-b border-slate-100 px-4 py-3.5">
+                    <span class="inline-flex items-center gap-1.5 border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800">
+                      <span class="size-1.5 rounded-full bg-amber-500" aria-hidden="true" />
+                      Pending
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  ) : (
+    <section class="border border-slate-200 bg-white px-6 py-16 text-center shadow-sm">
+      <div class="mx-auto grid size-10 place-items-center border border-slate-200 bg-slate-50 text-lg text-slate-400">
+        0
+      </div>
+      <h2 class="mt-4 text-base font-semibold text-slate-900">Nothing in this view</h2>
+      <p class="mt-1 text-sm text-slate-500">No pending documents match the selected filters.</p>
+    </section>
+  )
+}
