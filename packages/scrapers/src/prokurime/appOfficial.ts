@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { db } from '@tra/db';
 import {
   document_versions,
@@ -10,13 +9,17 @@ import {
   sources,
 } from '@tra/db';
 import {
+  APP_COLUMNS,
+  type AppCsvRow,
   LocalDiskAdapter,
   MUNICIPALITY_SLUGS,
   type MunicipalityContext,
   type MunicipalitySlug,
   buildMunicipalityTermSet,
+  canonicalAppRowHash,
   matchAuthorityToMunicipalityAcrossContexts,
   normalizeText,
+  requestTimestamp,
 } from '@tra/shared';
 import { parse } from 'csv-parse/sync';
 import { and, desc, eq } from 'drizzle-orm';
@@ -37,46 +40,6 @@ const HTTP_HEADERS = {
   'Accept-Language': 'sq-AL,sq;q=0.9,en;q=0.8',
 };
 
-const APP_COLUMNS = [
-  'Autoriteti_kontraktues',
-  'Numri_i_references',
-  'Objekti_i_prokurimit',
-  'Lloji_i_procedures',
-  'Tipi_i_kontrates',
-  'Lloji_i_marreveshjes_kuader',
-  'Fondi_limit',
-  'Data_e_publikimit',
-  'Data_e_hapjes',
-  'Data_e_mbylljes',
-  'Anulluar',
-  'Arsyeja_e_anullimit',
-  'Pezulluar',
-  'Fituesi',
-  'NIPT_i_fituesit',
-  'Vlera_e_fituesit',
-  'Vlera_e_fituesit_ne_lidhjen_e_kontrates',
-  'Lidhja_e_kontrates_me_TVSH',
-  'Numri_i_ofertave_te_dorezuara',
-  'Numri_i_ofertave_te_kualifikuara',
-  'Kodet_CPV',
-] as const;
-
-type AppColumn = (typeof APP_COLUMNS)[number];
-type AppCsvRow = Record<AppColumn, string>;
-
-const AMOUNT_COLUMNS = new Set<AppColumn>([
-  'Fondi_limit',
-  'Vlera_e_fituesit',
-  'Vlera_e_fituesit_ne_lidhjen_e_kontrates',
-]);
-
-const DATE_COLUMNS = new Set<AppColumn>(['Data_e_publikimit', 'Data_e_hapjes', 'Data_e_mbylljes']);
-
-const INTEGER_COLUMNS = new Set<AppColumn>([
-  'Numri_i_ofertave_te_dorezuara',
-  'Numri_i_ofertave_te_kualifikuara',
-]);
-
 const MUNICIPALITY_DEFS = [
   { slug: 'tirana', nameSq: 'Tiranë', aliasKeys: ['tirane'] },
   { slug: 'shkoder', nameSq: 'Shkodër', aliasKeys: ['shkodra'] },
@@ -90,10 +53,6 @@ const MUNICIPALITY_DEFS = [
 }[];
 
 const logger = pino({ name: 'importer:prokurime:app-official' });
-
-// TSQ builder copied from the vendime scrapers: RFC-3161 SHA-256 request, no external lib.
-const TSQ_PREFIX = Buffer.from('303902010130313' + '00d060960864801650304020105000420', 'hex');
-const TSQ_SUFFIX = Buffer.from('0101ff', 'hex');
 
 interface SourceContext extends MunicipalityContext {
   slug: MunicipalitySlug;
@@ -142,11 +101,6 @@ interface RunRow {
   slug: MunicipalitySlug;
 }
 
-function buildTsq(sha256Hex: string): Buffer {
-  const hashBytes = Buffer.from(sha256Hex, 'hex');
-  return Buffer.concat([TSQ_PREFIX, hashBytes, TSQ_SUFFIX]);
-}
-
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -173,43 +127,6 @@ function normalizeScalar(value: string): string {
     .replace(/\r\n?/g, '\n')
     .replace(/\s+/g, ' ')
     .trim();
-}
-
-function canonicalizeInteger(value: string): string {
-  const normalized = normalizeScalar(value).replace(/\s/g, '');
-  if (!normalized) return '';
-  if (!/^-?\d+$/.test(normalized)) return normalizeScalar(value);
-
-  const sign = normalized.startsWith('-') ? '-' : '';
-  const digits = sign ? normalized.slice(1) : normalized;
-  const integer = digits.replace(/^0+(?=\d)/, '');
-  return integer === '0' ? '0' : `${sign}${integer}`;
-}
-
-function canonicalizeAmount(value: string): string {
-  const original = normalizeScalar(value);
-  let normalized = original.replace(/\s/g, '');
-  if (!normalized) return '';
-
-  const hasComma = normalized.includes(',');
-  const hasDot = normalized.includes('.');
-  if (hasComma && hasDot) {
-    normalized = normalized.replace(/,/g, '');
-  } else if (hasComma && /^-?\d{1,3}(,\d{3})+$/.test(normalized)) {
-    normalized = normalized.replace(/,/g, '');
-  } else if (hasComma && /^-?\d+,\d+$/.test(normalized)) {
-    normalized = normalized.replace(',', '.');
-  }
-
-  const match = normalized.match(/^(-?)(\d+)(?:\.(\d+))?$/);
-  if (!match) return original;
-
-  const [, sign, integerRaw, fractionRaw = ''] = match;
-  const integer = integerRaw.replace(/^0+(?=\d)/, '');
-  const fraction = fractionRaw.replace(/0+$/, '');
-  const isZero = integer === '0' && !fraction;
-  const prefix = sign && !isZero ? sign : '';
-  return `${prefix}${integer}${fraction ? `.${fraction}` : ''}`;
 }
 
 function isLeapYear(year: number): boolean {
@@ -241,24 +158,6 @@ function parseAppDate(raw: string): string | null {
   return `${year.toString().padStart(4, '0')}-${month.toString().padStart(2, '0')}-${day
     .toString()
     .padStart(2, '0')}`;
-}
-
-function canonicalizeColumn(column: AppColumn, value: string): string {
-  if (AMOUNT_COLUMNS.has(column)) return canonicalizeAmount(value);
-  if (INTEGER_COLUMNS.has(column)) return canonicalizeInteger(value);
-  if (DATE_COLUMNS.has(column)) return parseAppDate(value) ?? normalizeScalar(value);
-  return normalizeScalar(value);
-}
-
-function buildCanonicalSnapshot(row: AppCsvRow): Buffer {
-  const fields = APP_COLUMNS.map((column) => [column, canonicalizeColumn(column, row[column])]);
-  return Buffer.from(
-    `${JSON.stringify({
-      schema: 'app.gov.al.prokurime.export-row.v1',
-      fields,
-    })}\n`,
-    'utf8',
-  );
 }
 
 function addSample(samples: string[], value: string): void {
@@ -334,8 +233,7 @@ function parseMatchedRow(row: AppCsvRow): ParsedAppRow | null {
 
   if (!appId || !authorityName || !procurementObject || !publishedDate) return null;
 
-  const canonicalBuffer = buildCanonicalSnapshot(row);
-  const sha256 = createHash('sha256').update(canonicalBuffer).digest('hex');
+  const { bytes: canonicalBuffer, sha256 } = canonicalAppRowHash(row);
 
   return {
     appId,
@@ -365,23 +263,12 @@ async function fetchWithRetry(url: string, maxRetries = 2): Promise<Response> {
 }
 
 async function stampDocument(docId: string, sha256Hex: string): Promise<void> {
-  const tsq = buildTsq(sha256Hex);
-  const res = await fetch('https://freetsa.org/tsr', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/timestamp-query',
-      Accept: 'application/timestamp-reply',
-    },
-    body: tsq,
-  });
-  if (!res.ok) throw new Error(`FreeTSA responded ${res.status}`);
-
-  const tsr = Buffer.from(await res.arrayBuffer());
-  if (tsr.length === 0) throw new Error('FreeTSA returned an empty timestamp reply');
+  const tsrToken = await requestTimestamp(sha256Hex, fetch);
+  if (!tsrToken) throw new Error('FreeTSA returned an empty timestamp reply');
 
   await db
     .update(documents)
-    .set({ tsr_token: tsr.toString('base64'), tsr_timestamp_at: new Date() })
+    .set({ tsr_token: tsrToken, tsr_timestamp_at: new Date() })
     .where(eq(documents.id, docId));
 }
 

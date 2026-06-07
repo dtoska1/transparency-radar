@@ -22,3 +22,15 @@ export type { IStorageAdapter, IEmailAdapter, INotificationAdapter } from './ada
 export { LocalDiskAdapter } from './local-disk-adapter.js';
 export { NullEmailer } from './null-emailer.js';
 export { ConsoleNotifier } from './console-notifier.js';
+export {
+  APP_COLUMNS,
+  canonicalAppRowHash,
+  hashBytes,
+  requestTimestamp,
+  validateTimestampToken,
+} from './tamper/index.js';
+export type {
+  AppColumn,
+  AppCsvRow,
+  TimestampValidationResult,
+} from './tamper/index.js';

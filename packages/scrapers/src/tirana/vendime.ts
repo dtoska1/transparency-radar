@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { db } from '@tra/db';
 import {
   document_versions,
@@ -9,7 +8,7 @@ import {
   vendim_documents,
   vendime,
 } from '@tra/db';
-import { LocalDiskAdapter, deriveDocFormat } from '@tra/shared';
+import { LocalDiskAdapter, deriveDocFormat, hashBytes, requestTimestamp } from '@tra/shared';
 import * as cheerio from 'cheerio';
 import { and, desc, eq } from 'drizzle-orm';
 import { fetch } from 'undici';
@@ -29,16 +28,6 @@ const HTTP_HEADERS = {
 };
 
 const CHALLENGE_MARKERS = ['Just a moment', 'cf-chl', 'challenge-platform'];
-
-// ── TSQ builder (RFC-3161 SHA-256, 59 bytes, no external lib) ─────────────────
-
-const TSQ_PREFIX = Buffer.from('303902010130313' + '00d060960864801650304020105000420', 'hex');
-const TSQ_SUFFIX = Buffer.from('0101ff', 'hex');
-
-function buildTsq(sha256Hex: string): Buffer {
-  const hashBytes = Buffer.from(sha256Hex, 'hex');
-  return Buffer.concat([TSQ_PREFIX, hashBytes, TSQ_SUFFIX]);
-}
 
 // ── Date helpers ──────────────────────────────────────────────────────────────
 
@@ -76,20 +65,10 @@ async function stampDocument(
   logger: import('pino').Logger,
 ): Promise<void> {
   try {
-    const tsq = buildTsq(sha256Hex);
-    const res = await fetch('https://freetsa.org/tsr', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/timestamp-query',
-        Accept: 'application/timestamp-reply',
-      },
-      body: tsq,
-    });
-    if (!res.ok) throw new Error(`FreeTSA responded ${res.status}`);
-    const tsr = Buffer.from(await res.arrayBuffer());
+    const tsrToken = await requestTimestamp(sha256Hex, fetch);
     await db
       .update(documents)
-      .set({ tsr_token: tsr.toString('base64'), tsr_timestamp_at: new Date() })
+      .set({ tsr_token: tsrToken, tsr_timestamp_at: new Date() })
       .where(eq(documents.id, docId));
   } catch (err) {
     logger.warn({ err, docId }, 'FreeTSA timestamp failed — tsr_token left null');
@@ -173,7 +152,7 @@ export class TiranaVendimeScraper extends BaseScraper {
             );
           } else {
             const buffer = Buffer.from(await docRes.arrayBuffer());
-            const sha256 = createHash('sha256').update(buffer).digest('hex');
+            const sha256 = hashBytes(buffer);
             const { ext, mime } = deriveDocFormat(entry.docUrl);
             if (ext === 'bin') {
               this.logger.warn({ url: entry.docUrl }, 'unknown document format — storing as .bin');

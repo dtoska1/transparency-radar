@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { db } from '@tra/db';
 import {
   audit_log,
@@ -11,7 +10,7 @@ import {
   vendim_documents,
   vendime,
 } from '@tra/db';
-import { LocalDiskAdapter, MUNICIPALITY_SLUGS } from '@tra/shared';
+import { LocalDiskAdapter, MUNICIPALITY_SLUGS, hashBytes } from '@tra/shared';
 import { and, desc, eq } from 'drizzle-orm';
 import type { RequestHandler } from 'express';
 import multer from 'multer';
@@ -168,7 +167,7 @@ export const handleAdminCreate: RequestHandler = async (req, res) => {
       return;
     }
 
-    const sha256 = createHash('sha256').update(buf).digest('hex');
+    const sha256 = hashBytes(buf);
     const key = `${meta.municipality}/${vertical}/${sha256}.pdf`;
 
     // source_url MUST NOT be fetched — stored as text only (SSRF guard)

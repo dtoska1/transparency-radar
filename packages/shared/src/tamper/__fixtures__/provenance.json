@@ -1,0 +1,30 @@
+{
+  "legacy": {
+    "repository": "cisba/pki-nodejs",
+    "commit": "c6cc2961a276d7e191b63e4f3c18989cef75b6dd",
+    "response_path": "FreeTSA/file.tsr",
+    "request_path": "FreeTSA/file.tsq",
+    "source_path": "FreeTSA/TRACE4EU.png",
+    "tsa": "FreeTSA",
+    "gen_time": "2024-05-27T15:30:54.000Z",
+    "digest_algorithm": "sha512",
+    "expected_digest": "6fff7f934661c4fdbce7339ffdbd699c0d38de434dd1916a8fcf7e57f79361cb91cc5eda6fae2351293469e46284d2ca216d0ccfe1749862f2410a71c8f14e49"
+  },
+  "current": {
+    "source": "DEV documents row",
+    "document_id": "db032579-c966-42f9-952d-a3814d61d670",
+    "source_origin": "app.gov.al",
+    "gen_time": "2026-06-03T16:58:02.000Z",
+    "digest_algorithm": "sha256",
+    "expected_digest": "987119f6a3bf62a15615d06d8e2cd8f86b742eca74ba648becb88be62c60021c"
+  },
+  "untrusted": {
+    "repository": "pitlabs/TrustedTimestamps",
+    "commit": "2d7a49d598251a0bd650e1d38bd435387f270640",
+    "response_path": "TimestampTest/Resources/response2.tsr",
+    "tsa": "DFN PKI",
+    "gen_time": "2017-01-13T07:34:00.000Z",
+    "digest_algorithm": "sha256",
+    "expected_digest": "ebf22164aef263abb3bb1fb9b252950879610f71ba0f58faba1dff26b665a6bb"
+  }
+}
