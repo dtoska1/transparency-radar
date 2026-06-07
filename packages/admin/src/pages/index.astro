@@ -3,6 +3,7 @@ import AdminShell from '../components/AdminShell.astro';
 import ReviewQueueTable from '../components/ReviewQueueTable.astro';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { adminApiFetch, relaySetCookies } from '../lib/apiClient';
+import { parseReviewNotice } from '../lib/reviewActions';
 import {
   MUNICIPALITIES,
   type PendingRow,
@@ -22,6 +23,7 @@ let serviceUnavailable = false;
 let rows: PendingRow[] = [];
 let hasNext = false;
 const filters = parseQueueFilters(Astro.url.searchParams);
+const notice = parseReviewNotice(Astro.url.searchParams);
 
 try {
   const response = await adminApiFetch(buildPendingApiPath(filters), {
@@ -126,7 +128,21 @@ const filtersActive = Boolean(filters.vertical || filters.municipality);
             )}
           </form>
 
-          <ReviewQueueTable rows={rows} />
+          {notice && (
+            <div
+              class:list={[
+                'mb-4 border px-4 py-3 text-sm font-medium',
+                notice.kind === 'success' && 'border-emerald-200 bg-emerald-50 text-emerald-800',
+                notice.kind === 'warning' && 'border-amber-200 bg-amber-50 text-amber-800',
+                notice.kind === 'error' && 'border-rose-200 bg-rose-50 text-rose-800',
+              ]}
+              role="status"
+            >
+              {notice.text}
+            </div>
+          )}
+
+          <ReviewQueueTable rows={rows} filters={filters} />
 
           <nav class="mt-4 flex items-center justify-between" aria-label="Queue pagination">
             <div>

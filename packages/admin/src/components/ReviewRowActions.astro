@@ -1,0 +1,151 @@
+---
+import type { PendingRow, QueueFilters } from '../lib/reviewQueue';
+
+interface Props {
+  row: PendingRow;
+  filters: QueueFilters;
+}
+
+const { row, filters } = Astro.props;
+const approveDialogId = `approve-${row.id}`;
+const rejectDialogId = `reject-${row.id}`;
+
+const returnFields = {
+  returnVertical: filters.vertical,
+  returnMunicipality: filters.municipality,
+  returnOffset: filters.offset > 0 ? String(filters.offset) : undefined,
+};
+---
+
+<div class="flex items-center gap-1.5 whitespace-nowrap">
+  <button
+    class="inline-flex h-8 items-center border border-emerald-700 bg-emerald-700 px-2.5 text-xs font-semibold text-white hover:bg-emerald-800"
+    type="button"
+    data-review-dialog={approveDialogId}
+  >
+    Approve
+  </button>
+  <button
+    class="inline-flex h-8 items-center border border-rose-300 bg-white px-2.5 text-xs font-semibold text-rose-700 hover:bg-rose-50"
+    type="button"
+    data-review-dialog={rejectDialogId}
+  >
+    Reject
+  </button>
+</div>
+
+<dialog
+  id={approveDialogId}
+  class="m-auto w-[min(28rem,calc(100%-2rem))] border border-slate-300 bg-white p-0 shadow-xl backdrop:bg-navy-950/50"
+>
+  <div class="border-b border-slate-200 px-5 py-4">
+    <p class="text-[10px] font-semibold uppercase text-emerald-700">Publish confirmation</p>
+    <h2 class="mt-1 text-lg font-semibold text-navy-950">Approve this document?</h2>
+  </div>
+  <div class="px-5 py-4">
+    <p class="text-sm leading-6 text-slate-600">
+      Approval publishes this document to the public site immediately.
+    </p>
+    <p class="mt-3 line-clamp-2 text-sm font-semibold text-slate-900">{row.title}</p>
+  </div>
+  <form class="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3" method="post" action="/api/review-action">
+    <input type="hidden" name="action" value="approve" />
+    <input type="hidden" name="vertical" value={row.vertical} />
+    <input type="hidden" name="id" value={row.id} />
+    {returnFields.returnVertical && (
+      <input type="hidden" name="returnVertical" value={returnFields.returnVertical} />
+    )}
+    {returnFields.returnMunicipality && (
+      <input type="hidden" name="returnMunicipality" value={returnFields.returnMunicipality} />
+    )}
+    {returnFields.returnOffset && (
+      <input type="hidden" name="returnOffset" value={returnFields.returnOffset} />
+    )}
+    <button
+      class="h-9 border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+      type="button"
+      data-close-dialog={approveDialogId}
+    >
+      Cancel
+    </button>
+    <button
+      class="h-9 bg-emerald-700 px-4 text-sm font-semibold text-white hover:bg-emerald-800"
+      type="submit"
+    >
+      Approve &amp; publish
+    </button>
+  </form>
+</dialog>
+
+<dialog
+  id={rejectDialogId}
+  class="m-auto w-[min(30rem,calc(100%-2rem))] border border-slate-300 bg-white p-0 shadow-xl backdrop:bg-navy-950/50"
+>
+  <div class="border-b border-slate-200 px-5 py-4">
+    <p class="text-[10px] font-semibold uppercase text-rose-700">Reject document</p>
+    <h2 class="mt-1 text-lg font-semibold text-navy-950">Remove from the pending queue?</h2>
+  </div>
+  <form method="post" action="/api/review-action">
+    <div class="px-5 py-4">
+      <p class="line-clamp-2 text-sm font-semibold text-slate-900">{row.title}</p>
+      <label class="mt-4 block">
+        <span class="mb-1.5 block text-xs font-semibold text-slate-700">
+          Reason <span class="font-normal text-slate-400">(optional)</span>
+        </span>
+        <textarea
+          class="min-h-24 w-full resize-y border border-slate-300 px-3 py-2 text-sm text-slate-800 outline-none focus:border-navy-700"
+          name="reason"
+          maxlength="500"
+          placeholder="Add a short internal reason"
+        ></textarea>
+      </label>
+    </div>
+    <input type="hidden" name="action" value="reject" />
+    <input type="hidden" name="vertical" value={row.vertical} />
+    <input type="hidden" name="id" value={row.id} />
+    {returnFields.returnVertical && (
+      <input type="hidden" name="returnVertical" value={returnFields.returnVertical} />
+    )}
+    {returnFields.returnMunicipality && (
+      <input type="hidden" name="returnMunicipality" value={returnFields.returnMunicipality} />
+    )}
+    {returnFields.returnOffset && (
+      <input type="hidden" name="returnOffset" value={returnFields.returnOffset} />
+    )}
+    <div class="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3">
+      <button
+        class="h-9 border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+        type="button"
+        data-close-dialog={rejectDialogId}
+      >
+        Cancel
+      </button>
+      <button
+        class="h-9 bg-rose-700 px-4 text-sm font-semibold text-white hover:bg-rose-800"
+        type="submit"
+      >
+        Reject document
+      </button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+  document.addEventListener('click', (event) => {
+    const target = event.target;
+    if (!(target instanceof Element)) return;
+
+    const opener = target.closest<HTMLElement>('[data-review-dialog]');
+    if (opener) {
+      const dialog = document.getElementById(opener.dataset.reviewDialog ?? '');
+      if (dialog instanceof HTMLDialogElement) dialog.showModal();
+      return;
+    }
+
+    const closer = target.closest<HTMLElement>('[data-close-dialog]');
+    if (closer) {
+      const dialog = document.getElementById(closer.dataset.closeDialog ?? '');
+      if (dialog instanceof HTMLDialogElement) dialog.close();
+    }
+  });
+</script>
