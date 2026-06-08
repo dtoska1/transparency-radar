@@ -2,16 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { stdin, stdout } from 'node:process';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
-import { type Options, hash } from '@node-rs/argon2';
+import { hash } from '@node-rs/argon2';
 import { admin_users, db } from '@tra/db';
 import { eq } from 'drizzle-orm';
-
-const ARGON2_OPTIONS = {
-  algorithm: 2,
-  memoryCost: 19_456,
-  timeCost: 2,
-  parallelism: 1,
-} satisfies Options;
+import { ARGON2_OPTIONS } from '../auth/password.js';
 
 const MIN_PASSWORD_LENGTH = 12;
 const LOCAL_DATABASE_HOSTS = new Set(['localhost', '127.0.0.1', 'postgres']);

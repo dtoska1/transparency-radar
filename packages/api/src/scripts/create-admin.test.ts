@@ -51,6 +51,7 @@ const hashMock = vi.hoisted(() => vi.fn(async () => 'argon2id-hash'));
 vi.mock('@node-rs/argon2', () => ({
   Algorithm: { Argon2id: 2 },
   hash: hashMock,
+  verify: vi.fn(),
 }));
 
 vi.mock('drizzle-orm', () => ({

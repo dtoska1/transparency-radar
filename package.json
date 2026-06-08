@@ -14,6 +14,7 @@
     "format": "biome format --write .",
     "test": "vitest run",
     "typecheck": "pnpm -r --if-present typecheck",
+    "admin:provision-prod": "pnpm --filter @tra/api exec tsx src/scripts/provision-prod-admin.ts",
     "db:up": "docker compose up -d postgres",
     "db:down": "docker compose down",
     "db:migrate": "pnpm --filter=./packages/db migrate",
