@@ -12,6 +12,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  unique,
   uuid,
 } from 'drizzle-orm/pg-core';
 
@@ -26,6 +27,16 @@ export const verticalEnum = pgEnum('vertical', ['vendime', 'konsultime', 'prokur
 type _AssertEqual<A, B> = [A] extends [B] ? ([B] extends [A] ? true : never) : never;
 export const _verticalSync: _AssertEqual<(typeof verticalEnum.enumValues)[number], Vertical> = true;
 export const reviewStatusEnum = pgEnum('review_status', ['pending', 'approved', 'rejected']);
+export const documentCheckStatusEnum = pgEnum('document_check_status', [
+  'verified',
+  'source_changed',
+  'stored_mismatch',
+  'token_invalid',
+  'token_missing',
+  'source_unreachable',
+  'source_not_applicable',
+  'error',
+]);
 export const konsultimeKindEnum = pgEnum('konsultime_kind', [
   'consultation_notice',
   'draft_act',
@@ -108,16 +119,23 @@ export const document_versions = pgTable('document_versions', {
   created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const document_checks = pgTable('document_checks', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  document_id: uuid('document_id')
-    .notNull()
-    .references(() => documents.id),
-  checked_at: timestamp('checked_at', { withTimezone: true }).notNull(),
-  status: text('status').notNull(),
-  result_detail: text('result_detail'),
-  created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+export const document_checks = pgTable(
+  'document_checks',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    document_id: uuid('document_id')
+      .notNull()
+      .references(() => documents.id),
+    run_id: text('run_id').notNull(),
+    checked_at: timestamp('checked_at', { withTimezone: true }).notNull(),
+    status: documentCheckStatusEnum('status').notNull(),
+    result_detail: jsonb('result_detail').notNull(),
+    created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    unique('document_checks_run_id_document_id_unique').on(table.run_id, table.document_id),
+  ],
+);
 
 // ── Vertical: Vendime ─────────────────────────────────────────────────────────
 
