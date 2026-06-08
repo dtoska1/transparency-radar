@@ -3,11 +3,12 @@
   "version": "0.1.0",
   "type": "module",
   "main": "./src/index.ts",
+  "files": ["dist"],
   "scripts": {
     "admin:create": "tsx src/scripts/create-admin.ts",
     "dev": "tsx watch src/index.ts",
-    "build": "tsc -b",
-    "start": "node dist/index.js",
+    "build": "tsc -b && node esbuild.config.mjs",
+    "start": "node dist/index.cjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -20,7 +21,6 @@
     "express": "^5.0.1",
     "express-rate-limit": "^7.5.0",
     "helmet": "^8.0.0",
-    "inngest": "^3.29.0",
     "multer": "^2.1.1",
     "pino": "^9.6.0",
     "pino-http": "^10.4.0",
@@ -32,6 +32,7 @@
     "@types/express": "^5.0.0",
     "@types/multer": "^2.1.0",
     "@types/node": "^22.10.7",
+    "esbuild": "^0.27.7",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",
     "vitest": "^2.1.8"

@@ -1,0 +1,11 @@
+.git
+.env
+.env.*
+!.env.example
+**/.astro
+**/dist
+**/node_modules
+**/uploads
+**/*.tsbuildinfo
+packages/admin/design-reference
+packages/scrapers

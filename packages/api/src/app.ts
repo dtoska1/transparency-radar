@@ -2,11 +2,10 @@ import cors from 'cors';
 import express, { type Express, type NextFunction, type Request, type Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
-import { serve } from 'inngest/express';
 import multer from 'multer';
 import { pinoHttp } from 'pino-http';
 import { ZodError } from 'zod';
-import { inngest } from './inngest.js';
+import { getAllowedOrigins } from './config.js';
 import { logger } from './logger.js';
 import { adminOriginCheck } from './middleware/adminOrigin.js';
 import { requireAdminSession } from './middleware/requireAdminSession.js';
@@ -15,7 +14,8 @@ import { createAdminAuthRouter } from './routes/adminAuth.js';
 import { publicRouter } from './routes/public.js';
 
 // Default-deny: if CORS_ORIGINS is unset, allowedOrigins is empty and all origins are blocked.
-const allowedOrigins = (process.env.CORS_ORIGINS ?? '').split(',').filter(Boolean);
+const allowedOrigins = getAllowedOrigins();
+export const AZURE_APP_SERVICE_PROXY_HOPS = 1;
 
 const publicLimiter = rateLimit({
   windowMs: 60_000,
@@ -41,6 +41,7 @@ const adminAuthLimiter = rateLimit({
 export function createApp(): Express {
   const app = express();
 
+  app.set('trust proxy', AZURE_APP_SERVICE_PROXY_HOPS);
   app.use(helmet());
   app.use(
     cors({
@@ -67,8 +68,6 @@ export function createApp(): Express {
     adminRouter,
   );
 
-  app.use('/api', publicLimiter, publicRouter);
-
   app.get('/api/v1/health', (_req, res) => {
     res.json({
       status: 'ok',
@@ -77,13 +76,7 @@ export function createApp(): Express {
     });
   });
 
-  app.use(
-    '/api/inngest',
-    serve({
-      client: inngest,
-      functions: [],
-    }),
-  );
+  app.use('/api', publicLimiter, publicRouter);
 
   // Central error handler — no stack traces to client
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
