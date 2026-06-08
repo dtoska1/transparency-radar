@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { adminApiFetch } from '../../lib/apiClient';
-import { POST } from './review-action';
+import { POST } from '../pages/api/review-action';
+import { adminApiFetch } from './apiClient';
 
-vi.mock('../../lib/apiClient', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../lib/apiClient')>();
+vi.mock('./apiClient', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./apiClient')>();
   return {
     ...actual,
     adminApiFetch: vi.fn(),

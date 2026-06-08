@@ -3,10 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "files": ["dist", "scripts/start.mjs"],
   "scripts": {
     "dev": "ASTRO_TELEMETRY_DISABLED=1 astro dev",
     "build": "ASTRO_TELEMETRY_DISABLED=1 astro build",
-    "start": "node dist/server/entry.mjs",
+    "start": "node scripts/start.mjs",
     "typecheck": "ASTRO_TELEMETRY_DISABLED=1 astro check"
   },
   "dependencies": {

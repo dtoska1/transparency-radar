@@ -25,8 +25,15 @@ export function extractSessionCookie(cookieHeader: string | null | undefined): s
 }
 
 export function getAdminApiBaseUrl(env: NodeJS.ProcessEnv = process.env): URL {
-  const configured = env.ADMIN_API_BASE_URL?.trim() || DEFAULT_ADMIN_API_BASE_URL;
-  const url = new URL(configured);
+  const configured = env.ADMIN_API_BASE_URL?.trim();
+  if (env.NODE_ENV === 'production' && !configured) {
+    throw new Error('ADMIN_API_BASE_URL is required in production');
+  }
+
+  const url = new URL(configured || DEFAULT_ADMIN_API_BASE_URL);
+  if (env.NODE_ENV === 'production' && url.protocol !== 'https:') {
+    throw new Error('ADMIN_API_BASE_URL must use https in production');
+  }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') {
     throw new Error('ADMIN_API_BASE_URL must use http or https');
   }

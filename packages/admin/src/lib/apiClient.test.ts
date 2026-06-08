@@ -16,7 +16,7 @@ describe('admin BFF API client', () => {
     expect(extractSessionCookie('tra_admin_session_extra=no; other=value')).toBeUndefined();
   });
 
-  it('defaults to the local API and accepts only http or https configuration', () => {
+  it('defaults to the local API outside production and accepts only http or https', () => {
     expect(getAdminApiBaseUrl({}).href).toBe('http://localhost:3000/');
     expect(getAdminApiBaseUrl({ ADMIN_API_BASE_URL: 'https://api.example.test/base/' }).href).toBe(
       'https://api.example.test/base/',
@@ -24,6 +24,24 @@ describe('admin BFF API client', () => {
     expect(() => getAdminApiBaseUrl({ ADMIN_API_BASE_URL: 'file:///tmp/api' })).toThrow(
       'ADMIN_API_BASE_URL must use http or https',
     );
+  });
+
+  it('requires an HTTPS API URL in production', () => {
+    expect(() => getAdminApiBaseUrl({ NODE_ENV: 'production' })).toThrow(
+      'ADMIN_API_BASE_URL is required in production',
+    );
+    expect(() =>
+      getAdminApiBaseUrl({
+        NODE_ENV: 'production',
+        ADMIN_API_BASE_URL: 'http://api.example.test',
+      }),
+    ).toThrow('ADMIN_API_BASE_URL must use https in production');
+    expect(
+      getAdminApiBaseUrl({
+        NODE_ENV: 'production',
+        ADMIN_API_BASE_URL: 'https://api.radarivendor.com',
+      }).href,
+    ).toBe('https://api.radarivendor.com/');
   });
 
   it('forwards only the session cookie and explicitly requested content type', async () => {
