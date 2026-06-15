@@ -64,7 +64,6 @@ type KonsultimeMeta = z.infer<typeof KonsultimeSchema>;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-
 function isPdf(buf: Buffer): boolean {
   // %PDF- magic bytes: 0x25 0x50 0x44 0x46 0x2D
   return (

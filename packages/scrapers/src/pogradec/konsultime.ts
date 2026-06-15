@@ -6,8 +6,7 @@ import { and, eq } from 'drizzle-orm';
 import { fetch } from 'undici';
 import { BaseScraper } from '../base-scraper.js';
 
-const LISTING_URL =
-  'https://bashkiapogradec.gov.al/publikime-kategori/konsultim-publik-10/';
+const LISTING_URL = 'https://bashkiapogradec.gov.al/publikime-kategori/konsultim-publik-10/';
 const SOURCE_ORIGIN = 'bashkiapogradec.gov.al';
 const YEAR_FLOOR = 2023;
 
@@ -145,9 +144,7 @@ export class PogradecKonsultimeScraper extends BaseScraper {
       const $a = $(el);
       const href = $a.attr('href') ?? '';
       if (!href) return;
-      const sourceUrl = href.startsWith('http')
-        ? href
-        : new URL(href, LISTING_URL).toString();
+      const sourceUrl = href.startsWith('http') ? href : new URL(href, LISTING_URL).toString();
       if (seen.has(sourceUrl)) return;
       seen.add(sourceUrl);
 
@@ -156,7 +153,8 @@ export class PogradecKonsultimeScraper extends BaseScraper {
 
       const $section = $a.closest('section');
       const excerpt = $section.find('p').first().text().trim();
-      const rawDate = $section.find('span').first().text().trim();
+      // Date lives in the immediately following sibling <section> (clock icon + <span>DD-MM-YYYY</span>)
+      const rawDate = $section.next('section').find('span').first().text().trim();
       const publishedDate = parseListingDate(rawDate);
       if (!publishedDate) {
         this.logger.warn({ rawDate, sourceUrl }, 'Could not parse date — skipping card');

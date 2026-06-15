@@ -1,6 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('@tra/db', () => ({ db: {}, konsultime: {}, municipalities: {}, scrape_runs: {}, sources: {} }));
+vi.mock('@tra/db', () => ({
+  db: {},
+  konsultime: {},
+  municipalities: {},
+  scrape_runs: {},
+  sources: {},
+}));
 
 import { classifyKind, parseListingDate } from './konsultime.js';
 
