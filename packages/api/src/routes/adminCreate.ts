@@ -10,7 +10,7 @@ import {
   vendim_documents,
   vendime,
 } from '@tra/db';
-import { LocalDiskAdapter, MUNICIPALITY_SLUGS, hashBytes } from '@tra/shared';
+import { LocalDiskAdapter, MUNICIPALITY_SLUGS, hashBytes, toSlug } from '@tra/shared';
 import { and, desc, eq } from 'drizzle-orm';
 import type { RequestHandler } from 'express';
 import multer from 'multer';
@@ -64,12 +64,6 @@ type KonsultimeMeta = z.infer<typeof KonsultimeSchema>;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function toSlug(s: string): string {
-  return s
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
 
 function isPdf(buf: Buffer): boolean {
   // %PDF- magic bytes: 0x25 0x50 0x44 0x46 0x2D

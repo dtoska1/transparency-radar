@@ -34,3 +34,4 @@ export type {
   AppCsvRow,
   TimestampValidationResult,
 } from './tamper/index.js';
+export { toSlug } from './slug.js';
