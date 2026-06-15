@@ -105,11 +105,15 @@ async function listApprovedVendime({ municipality, year, q, limit, offset }: Lis
     .select({
       id: vendime.id,
       title: vendime.title,
+      summary: vendime.summary,
+      number_normalized: vendime.number_normalized,
+      year_signed: vendime.year_signed,
       published_date: sql<string>`${vendime.published_date}::text`,
       municipality: municipalities.slug,
       source_origin: vendime.source_origin,
       source_url: vendime.source_url,
       review_status: vendime.review_status,
+      is_unofficial_proxy: vendime.is_unofficial_proxy,
     })
     .from(vendime)
     .innerJoin(municipalities, eq(vendime.municipality_id, municipalities.id))
@@ -129,11 +133,14 @@ async function listApprovedKonsultime({ municipality, year, q, limit, offset }: 
     .select({
       id: konsultime.id,
       title: konsultime.title,
+      summary: konsultime.summary,
+      kind: konsultime.kind,
       published_date: sql<string>`${konsultime.published_date}::text`,
       municipality: municipalities.slug,
       source_origin: konsultime.source_origin,
       source_url: konsultime.source_url,
       review_status: konsultime.review_status,
+      is_unofficial_proxy: konsultime.is_unofficial_proxy,
     })
     .from(konsultime)
     .innerJoin(municipalities, eq(konsultime.municipality_id, municipalities.id))
@@ -152,12 +159,16 @@ async function listApprovedProkurime({ municipality, year, q, limit, offset }: L
   return db
     .select({
       id: prokurime.id,
+      app_id: prokurime.app_id,
       title: prokurime.title,
+      contracting_authority: prokurime.contracting_authority,
+      procurement_object: prokurime.procurement_object,
       published_date: sql<string>`${prokurime.published_date}::text`,
       municipality: municipalities.slug,
       source_origin: prokurime.source_origin,
       source_url: prokurime.source_url,
       review_status: prokurime.review_status,
+      is_unofficial_proxy: prokurime.is_unofficial_proxy,
     })
     .from(prokurime)
     .innerJoin(municipalities, eq(prokurime.municipality_id, municipalities.id))
@@ -182,11 +193,15 @@ async function getApprovedVendimeById(id: string) {
     .select({
       id: vendime.id,
       title: vendime.title,
+      summary: vendime.summary,
+      number_normalized: vendime.number_normalized,
+      year_signed: vendime.year_signed,
       published_date: sql<string>`${vendime.published_date}::text`,
       municipality: municipalities.slug,
       source_origin: vendime.source_origin,
       source_url: vendime.source_url,
       review_status: vendime.review_status,
+      is_unofficial_proxy: vendime.is_unofficial_proxy,
     })
     .from(vendime)
     .innerJoin(municipalities, eq(vendime.municipality_id, municipalities.id))
@@ -200,11 +215,14 @@ async function getApprovedKonsultimeById(id: string) {
     .select({
       id: konsultime.id,
       title: konsultime.title,
+      summary: konsultime.summary,
+      kind: konsultime.kind,
       published_date: sql<string>`${konsultime.published_date}::text`,
       municipality: municipalities.slug,
       source_origin: konsultime.source_origin,
       source_url: konsultime.source_url,
       review_status: konsultime.review_status,
+      is_unofficial_proxy: konsultime.is_unofficial_proxy,
     })
     .from(konsultime)
     .innerJoin(municipalities, eq(konsultime.municipality_id, municipalities.id))
@@ -217,12 +235,16 @@ async function getApprovedProkurimById(id: string) {
   const [row] = await db
     .select({
       id: prokurime.id,
+      app_id: prokurime.app_id,
       title: prokurime.title,
+      contracting_authority: prokurime.contracting_authority,
+      procurement_object: prokurime.procurement_object,
       published_date: sql<string>`${prokurime.published_date}::text`,
       municipality: municipalities.slug,
       source_origin: prokurime.source_origin,
       source_url: prokurime.source_url,
       review_status: prokurime.review_status,
+      is_unofficial_proxy: prokurime.is_unofficial_proxy,
     })
     .from(prokurime)
     .innerJoin(municipalities, eq(prokurime.municipality_id, municipalities.id))
@@ -249,7 +271,8 @@ async function getDocumentsVendime(rowId: string) {
       slot_ref: document_versions.slot_ref,
       version_no: document_versions.version_no,
       sha256: documents.sha256,
-      storage_uri: documents.storage_uri,
+      mime_type: documents.mime_type,
+      byte_size: documents.byte_size,
       tsr_timestamp_at: documents.tsr_timestamp_at,
     })
     .from(vendim_documents)
@@ -265,7 +288,8 @@ async function getDocumentsKonsultime(rowId: string) {
       slot_ref: document_versions.slot_ref,
       version_no: document_versions.version_no,
       sha256: documents.sha256,
-      storage_uri: documents.storage_uri,
+      mime_type: documents.mime_type,
+      byte_size: documents.byte_size,
       tsr_timestamp_at: documents.tsr_timestamp_at,
     })
     .from(konsultim_documents)
@@ -281,7 +305,8 @@ async function getDocumentsProkurime(rowId: string) {
       slot_ref: document_versions.slot_ref,
       version_no: document_versions.version_no,
       sha256: documents.sha256,
-      storage_uri: documents.storage_uri,
+      mime_type: documents.mime_type,
+      byte_size: documents.byte_size,
       tsr_timestamp_at: documents.tsr_timestamp_at,
     })
     .from(prokurim_documents)
