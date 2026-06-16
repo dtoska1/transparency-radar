@@ -9,13 +9,22 @@ import { ARGON2_OPTIONS } from '../auth/password.js';
 
 const MIN_PASSWORD_LENGTH = 12;
 const LOCAL_DATABASE_HOSTS = new Set(['localhost', '127.0.0.1', 'postgres']);
+const USAGE =
+  'Usage: pnpm --filter @tra/api admin:create -- --email admin@example.com [--reset] [--allow-remote]';
 
 export interface CreateAdminArgs {
   email: string;
   reset: boolean;
+  allowRemote: boolean;
 }
 
 export type CreateAdminResult = 'created' | 'reset' | 'exists';
+export type DatabaseHostClassification = 'local' | 'remote';
+
+export interface CreateAdminDatabaseTarget {
+  hostname: string;
+  requiresRemoteConfirmation: boolean;
+}
 
 interface HiddenPrompt {
   _writeToOutput(input: string): void;
@@ -29,6 +38,7 @@ export function normalizeEmail(email: string): string {
 export function parseCreateAdminArgs(argv: string[]): CreateAdminArgs {
   let email: string | undefined;
   let reset = false;
+  let allowRemote = false;
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -37,6 +47,10 @@ export function parseCreateAdminArgs(argv: string[]): CreateAdminArgs {
     }
     if (arg === '--reset') {
       reset = true;
+      continue;
+    }
+    if (arg === '--allow-remote') {
+      allowRemote = true;
       continue;
     }
     if (arg === '--email') {
@@ -48,34 +62,52 @@ export function parseCreateAdminArgs(argv: string[]): CreateAdminArgs {
       email = arg.slice('--email='.length);
       continue;
     }
-    throw new Error(
-      'Usage: pnpm --filter @tra/api admin:create -- --email admin@example.com [--reset]',
-    );
+    throw new Error(USAGE);
   }
 
   const normalized = normalizeEmail(email ?? '');
   if (!normalized || !normalized.includes('@')) {
-    throw new Error(
-      'Usage: pnpm --filter @tra/api admin:create -- --email admin@example.com [--reset]',
-    );
+    throw new Error(USAGE);
   }
 
-  return { email: normalized, reset };
+  return { email: normalized, reset, allowRemote };
 }
 
-export function assertDevDatabase(databaseUrl = process.env.DATABASE_URL): void {
+export function getDatabaseHostname(databaseUrl = process.env.DATABASE_URL): string {
   if (!databaseUrl) throw new Error('DATABASE_URL is required');
 
-  let hostname = '';
   try {
-    hostname = new URL(databaseUrl).hostname;
+    return new URL(databaseUrl).hostname;
   } catch {
     throw new Error('DATABASE_URL is not a valid URL');
   }
+}
 
-  if (!LOCAL_DATABASE_HOSTS.has(hostname)) {
+export function classifyDatabaseHost(
+  databaseUrl = process.env.DATABASE_URL,
+): DatabaseHostClassification {
+  return LOCAL_DATABASE_HOSTS.has(getDatabaseHostname(databaseUrl)) ? 'local' : 'remote';
+}
+
+export function resolveCreateAdminDatabaseTarget(
+  databaseUrl = process.env.DATABASE_URL,
+  allowRemote = false,
+): CreateAdminDatabaseTarget {
+  const hostname = getDatabaseHostname(databaseUrl);
+  const classification = LOCAL_DATABASE_HOSTS.has(hostname) ? 'local' : 'remote';
+
+  if (classification === 'remote' && !allowRemote) {
     throw new Error('create-admin is DEV-only; refusing non-local DATABASE_URL host');
   }
+
+  return {
+    hostname,
+    requiresRemoteConfirmation: classification === 'remote',
+  };
+}
+
+export function assertDevDatabase(databaseUrl = process.env.DATABASE_URL): void {
+  resolveCreateAdminDatabaseTarget(databaseUrl, false);
 }
 
 export function validatePassword(password: string): void {
@@ -102,6 +134,29 @@ async function promptHidden(label: string): Promise<string> {
   }
 }
 
+async function promptVisible(label: string): Promise<string> {
+  const rl = readline.createInterface({ input: stdin, output: stdout, terminal: true });
+  try {
+    return await new Promise<string>((resolve) => {
+      rl.question(label, resolve);
+    });
+  } finally {
+    rl.close();
+  }
+}
+
+async function confirmRemoteDatabaseHostname(hostname: string): Promise<void> {
+  if (!stdin.isTTY || !stdout.isTTY) {
+    throw new Error('Interactive TTY is required for remote DATABASE_URL confirmation');
+  }
+
+  stdout.write(`Remote DATABASE_URL host: ${hostname}\n`);
+  const typedHostname = await promptVisible(`Type "${hostname}" to continue: `);
+  if (typedHostname !== hostname) {
+    throw new Error('Remote DATABASE_URL hostname confirmation did not match; nothing was written');
+  }
+}
+
 async function readPasswordInteractively(): Promise<string> {
   if (!stdin.isTTY || !stdout.isTTY) {
     throw new Error('Interactive TTY is required for hidden password prompt');
@@ -120,7 +175,7 @@ export async function createAdminUser({
   email,
   password,
   reset,
-}: CreateAdminArgs & { password: string }): Promise<CreateAdminResult> {
+}: Pick<CreateAdminArgs, 'email' | 'reset'> & { password: string }): Promise<CreateAdminResult> {
   const normalizedEmail = normalizeEmail(email);
   validatePassword(password);
 
@@ -152,7 +207,13 @@ export async function createAdminUser({
 
 async function main(argv: string[]): Promise<void> {
   const args = parseCreateAdminArgs(argv);
-  assertDevDatabase();
+  const databaseTarget = resolveCreateAdminDatabaseTarget(
+    process.env.DATABASE_URL,
+    args.allowRemote,
+  );
+  if (databaseTarget.requiresRemoteConfirmation) {
+    await confirmRemoteDatabaseHostname(databaseTarget.hostname);
+  }
   const password = await readPasswordInteractively();
   const result = await createAdminUser({ ...args, password });
 

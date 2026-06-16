@@ -68,9 +68,11 @@ vi.mock('@tra/db', () => ({
 
 import {
   assertDevDatabase,
+  classifyDatabaseHost,
   createAdminUser,
   normalizeEmail,
   parseCreateAdminArgs,
+  resolveCreateAdminDatabaseTarget,
 } from './create-admin.js';
 
 describe('create-admin script helpers', () => {
@@ -79,24 +81,65 @@ describe('create-admin script helpers', () => {
     expect(parseCreateAdminArgs(['--email', 'Admin@Example.COM', '--reset'])).toEqual({
       email: 'admin@example.com',
       reset: true,
+      allowRemote: false,
     });
     expect(parseCreateAdminArgs(['--email=Admin@Example.COM'])).toEqual({
       email: 'admin@example.com',
       reset: false,
+      allowRemote: false,
     });
     expect(parseCreateAdminArgs(['--', '--email', 'Admin@Example.COM'])).toEqual({
       email: 'admin@example.com',
       reset: false,
+      allowRemote: false,
+    });
+    expect(parseCreateAdminArgs(['--email', 'Admin@Example.COM', '--allow-remote'])).toEqual({
+      email: 'admin@example.com',
+      reset: false,
+      allowRemote: true,
     });
   });
 
-  it('rejects non-local database URLs', () => {
+  it('classifies database URL hosts', () => {
+    expect(classifyDatabaseHost('postgresql://tra:tra_dev@localhost:5432/tra')).toBe('local');
+    expect(classifyDatabaseHost('postgresql://tra:tra_dev@127.0.0.1:5432/tra')).toBe('local');
+    expect(classifyDatabaseHost('postgresql://tra:tra_dev@postgres:5432/tra')).toBe('local');
+    expect(
+      classifyDatabaseHost('postgresql://user:secret@ep-example.eu-central-1.aws.neon.tech/db'),
+    ).toBe('remote');
+  });
+
+  it('keeps the default DEV-only database guard', () => {
     expect(() => assertDevDatabase('postgresql://tra:tra_dev@localhost:5432/tra')).not.toThrow();
     expect(() => assertDevDatabase('postgresql://tra:tra_dev@127.0.0.1:5432/tra')).not.toThrow();
     expect(() => assertDevDatabase('postgresql://tra:tra_dev@postgres:5432/tra')).not.toThrow();
     expect(() => assertDevDatabase('postgresql://tra:tra_dev@db.example.com:5432/tra')).toThrow(
       /DEV-only/,
     );
+  });
+
+  it('requires confirmation only when a remote host is explicitly allowed', () => {
+    expect(
+      resolveCreateAdminDatabaseTarget('postgresql://tra:tra_dev@localhost:5432/tra', false),
+    ).toEqual({
+      hostname: 'localhost',
+      requiresRemoteConfirmation: false,
+    });
+    expect(() =>
+      resolveCreateAdminDatabaseTarget(
+        'postgresql://user:secret@ep-example.eu-central-1.aws.neon.tech/db',
+        false,
+      ),
+    ).toThrow(/DEV-only/);
+    expect(
+      resolveCreateAdminDatabaseTarget(
+        'postgresql://user:secret@ep-example.eu-central-1.aws.neon.tech/db',
+        true,
+      ),
+    ).toEqual({
+      hostname: 'ep-example.eu-central-1.aws.neon.tech',
+      requiresRemoteConfirmation: true,
+    });
   });
 
   it('creates a new admin user with a hashed password', async () => {
