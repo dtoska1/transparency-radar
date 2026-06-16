@@ -5,17 +5,13 @@ import helmet from 'helmet';
 import multer from 'multer';
 import { pinoHttp } from 'pino-http';
 import { ZodError } from 'zod';
-import { getAllowedOrigins } from './config.js';
+import { type ApiRuntimeConfig, validateApiRuntimeConfig } from './config.js';
 import { logger } from './logger.js';
 import { adminOriginCheck } from './middleware/adminOrigin.js';
 import { requireAdminSession } from './middleware/requireAdminSession.js';
 import { adminRouter } from './routes/admin.js';
 import { createAdminAuthRouter } from './routes/adminAuth.js';
 import { publicRouter } from './routes/public.js';
-
-// Default-deny: if CORS_ORIGINS is unset, allowedOrigins is empty and all origins are blocked.
-const allowedOrigins = getAllowedOrigins();
-export const AZURE_APP_SERVICE_PROXY_HOPS = 1;
 
 const publicLimiter = rateLimit({
   windowMs: 60_000,
@@ -38,10 +34,11 @@ const adminAuthLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-export function createApp(): Express {
+export function createApp(config: ApiRuntimeConfig = validateApiRuntimeConfig()): Express {
   const app = express();
+  const { allowedOrigins, trustProxyHops } = config;
 
-  app.set('trust proxy', AZURE_APP_SERVICE_PROXY_HOPS);
+  app.set('trust proxy', trustProxyHops);
   app.use(helmet());
   app.use(
     cors({

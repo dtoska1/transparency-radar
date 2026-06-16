@@ -9,6 +9,7 @@ const validProductionEnv = {
   PORT: '8080',
   STORAGE_ADAPTER: 'local',
   STORAGE_LOCAL_PATH: '/app/uploads',
+  TRUST_PROXY_HOPS: '2',
 };
 
 describe('API runtime config', () => {
@@ -16,6 +17,7 @@ describe('API runtime config', () => {
     expect(validateApiRuntimeConfig(validProductionEnv)).toEqual({
       allowedOrigins: ['https://admin.radarivendor.com'],
       port: 8080,
+      trustProxyHops: 2,
     });
   });
 
@@ -25,6 +27,7 @@ describe('API runtime config', () => {
     'DATABASE_URL',
     'STORAGE_ADAPTER',
     'STORAGE_LOCAL_PATH',
+    'TRUST_PROXY_HOPS',
   ] as const)('fails closed when %s is missing in production', (name) => {
     const env = { ...validProductionEnv };
     delete env[name];
@@ -38,6 +41,44 @@ describe('API runtime config', () => {
         CORS_ORIGINS: 'http://admin.radarivendor.com',
       }),
     ).toThrow('HTTPS origins');
+  });
+
+  it('parses valid trust proxy hop counts', () => {
+    expect(
+      validateApiRuntimeConfig({
+        ...validProductionEnv,
+        TRUST_PROXY_HOPS: '0',
+      }).trustProxyHops,
+    ).toBe(0);
+    expect(
+      validateApiRuntimeConfig({
+        ...validProductionEnv,
+        TRUST_PROXY_HOPS: '10',
+      }).trustProxyHops,
+    ).toBe(10);
+  });
+
+  it.each(['1.5', '-1', '11', 'not-a-number'])(
+    'rejects invalid TRUST_PROXY_HOPS=%s',
+    (trustProxyHops) => {
+      expect(() =>
+        validateApiRuntimeConfig({
+          ...validProductionEnv,
+          TRUST_PROXY_HOPS: trustProxyHops,
+        }),
+      ).toThrow('TRUST_PROXY_HOPS must be an integer between 0 and 10');
+    },
+  );
+
+  it('defaults trust proxy hops in non-production', () => {
+    expect(
+      validateApiRuntimeConfig({
+        CORS_ORIGINS: 'http://localhost:4321',
+        NODE_ENV: 'development',
+      }),
+    ).toMatchObject({
+      trustProxyHops: 1,
+    });
   });
 
   it('keeps local development origin parsing permissive', () => {

@@ -1,10 +1,13 @@
 import { assertAdminSessionSecret } from './auth/config.js';
 
 const SUPPORTED_STORAGE_ADAPTER = 'local';
+const DEFAULT_DEV_TRUST_PROXY_HOPS = 1;
+const MAX_TRUST_PROXY_HOPS = 10;
 
 export interface ApiRuntimeConfig {
   allowedOrigins: string[];
   port: number;
+  trustProxyHops: number;
 }
 
 function requireValue(env: NodeJS.ProcessEnv, name: string): string {
@@ -19,6 +22,14 @@ function parsePort(rawPort: string | undefined): number {
     throw new Error('PORT must be an integer between 1 and 65535');
   }
   return port;
+}
+
+function parseTrustProxyHops(rawHops: string | undefined): number {
+  const hops = Number(rawHops ?? DEFAULT_DEV_TRUST_PROXY_HOPS);
+  if (!Number.isInteger(hops) || hops < 0 || hops > MAX_TRUST_PROXY_HOPS) {
+    throw new Error('TRUST_PROXY_HOPS must be an integer between 0 and 10');
+  }
+  return hops;
 }
 
 function parseAllowedOrigins(rawOrigins: string): string[] {
@@ -52,9 +63,12 @@ export function getAllowedOrigins(env: NodeJS.ProcessEnv = process.env): string[
 
 export function validateApiRuntimeConfig(env: NodeJS.ProcessEnv = process.env): ApiRuntimeConfig {
   const port = parsePort(env.PORT);
+  const trustProxyHops = parseTrustProxyHops(
+    env.NODE_ENV === 'production' ? requireValue(env, 'TRUST_PROXY_HOPS') : env.TRUST_PROXY_HOPS,
+  );
 
   if (env.NODE_ENV !== 'production') {
-    return { allowedOrigins: getAllowedOrigins(env), port };
+    return { allowedOrigins: getAllowedOrigins(env), port, trustProxyHops };
   }
 
   const databaseUrl = new URL(requireValue(env, 'DATABASE_URL'));
@@ -73,5 +87,6 @@ export function validateApiRuntimeConfig(env: NodeJS.ProcessEnv = process.env): 
   return {
     allowedOrigins: getAllowedOrigins(env),
     port,
+    trustProxyHops,
   };
 }
