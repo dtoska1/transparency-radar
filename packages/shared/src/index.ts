@@ -35,3 +35,4 @@ export type {
   TimestampValidationResult,
 } from './tamper/index.js';
 export { toSlug } from './slug.js';
+export { classifyDocType, type KonsultimeDocType } from './classifyDocType.js';
