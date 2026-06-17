@@ -13,7 +13,7 @@ export type KonsultimeDocType =
   | 'other';
 
 function fold(s: string): string {
-  return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  return s.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '');
 }
 
 function escapeRe(s: string): string {
@@ -32,14 +32,39 @@ function hasStem(hay: string, kw: string): boolean {
 // Order matters: a "njoftim" that merely mentions a draft act is still a notice,
 // so notice is checked before draft_act. Higher-signal report/RIA/hearing first.
 const RULES: ReadonlyArray<{ type: KonsultimeDocType; keywords: readonly string[] }> = [
-  { type: 'feedback_report',     keywords: ['raport i konsultimit', 'raporti i konsultimit', 'raport konsultimi', 'permbledhje e komenteve', 'raport permbledhes'] },
-  { type: 'ria',                 keywords: ['vleresim ndikimi', 'vleresim i ndikimit', 'vleresimi strategjik', '(ria)'] },
-  { type: 'hearing',             keywords: ['procesverbal', 'degjes', 'seance degjimore'] },
-  { type: 'explanatory_memo',    keywords: ['relacion', 'memorandum shpjegues'] },
+  {
+    type: 'feedback_report',
+    keywords: [
+      'raport i konsultimit',
+      'raporti i konsultimit',
+      'raport konsultimi',
+      'permbledhje e komenteve',
+      'raport permbledhes',
+    ],
+  },
+  {
+    type: 'ria',
+    keywords: ['vleresim ndikimi', 'vleresim i ndikimit', 'vleresimi strategjik', '(ria)'],
+  },
+  { type: 'hearing', keywords: ['procesverbal', 'degjes', 'seance degjimore'] },
+  { type: 'explanatory_memo', keywords: ['relacion', 'memorandum shpjegues'] },
   { type: 'expert_consultation', keywords: ['konsultim me eksperte', 'konsultime me eksperte'] },
-  { type: 'timeline',            keywords: ['kalendar', 'afat', 'periudha e konsultimit'] },
-  { type: 'notice',              keywords: ['njoftim', 'ftese per konsultim', 'ftese'] },
-  { type: 'draft_act',           keywords: ['projektakt', 'projekt-akt', 'projekt akt', 'projektligj', 'projekt ligj', 'projektvendim', 'projekt vendim', 'projekt-vendim', 'draft'] },
+  { type: 'timeline', keywords: ['kalendar', 'afat', 'periudha e konsultimit'] },
+  { type: 'notice', keywords: ['njoftim', 'ftese per konsultim', 'ftese'] },
+  {
+    type: 'draft_act',
+    keywords: [
+      'projektakt',
+      'projekt-akt',
+      'projekt akt',
+      'projektligj',
+      'projekt ligj',
+      'projektvendim',
+      'projekt vendim',
+      'projekt-vendim',
+      'draft',
+    ],
+  },
 ];
 
 /**
