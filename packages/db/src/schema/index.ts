@@ -94,6 +94,14 @@ export const admin_sessions = pgTable('admin_sessions', {
   created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+// Manual allowlist for admin emails outside the @csdgalbania.org domain rule.
+export const admin_allowlist = pgTable('admin_allowlist', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  email: text('email').notNull().unique(),
+  added_by: text('added_by'),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 // ── Tamper-evidence tables ────────────────────────────────────────────────────
 
 export const documents = pgTable('documents', {

@@ -10,6 +10,7 @@ import { logger } from './logger.js';
 import { adminOriginCheck } from './middleware/adminOrigin.js';
 import { requireAdminSession } from './middleware/requireAdminSession.js';
 import { adminRouter } from './routes/admin.js';
+import { adminAllowlistRouter } from './routes/adminAllowlist.js';
 import { createAdminAuthRouter } from './routes/adminAuth.js';
 import { publicRouter } from './routes/public.js';
 
@@ -62,6 +63,7 @@ export function createApp(config: ApiRuntimeConfig = validateApiRuntimeConfig())
     adminLimiter,
     adminOriginCheck(allowedOrigins),
     requireAdminSession,
+    adminAllowlistRouter,
     adminRouter,
   );
 

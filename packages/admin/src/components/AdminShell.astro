@@ -1,9 +1,10 @@
 ---
 interface Props {
-  pendingCount: number;
+  pendingCount?: number;
 }
 
 const { pendingCount } = Astro.props;
+const currentPath = Astro.url.pathname;
 ---
 
 <div class="min-h-screen bg-surface lg:flex">
@@ -28,15 +29,31 @@ const { pendingCount } = Astro.props;
         Operations
       </p>
       <a
-        class="flex flex-1 items-center gap-2 bg-blue-50 px-3 py-2 text-sm font-semibold text-navy-800 lg:w-full"
+        class:list={[
+          'flex flex-1 items-center gap-2 px-3 py-2 text-sm font-semibold lg:w-full',
+          currentPath === '/' ? 'bg-blue-50 text-navy-800' : 'text-slate-600 hover:bg-slate-50',
+        ]}
         href="/"
-        aria-current="page"
+        aria-current={currentPath === '/' ? 'page' : undefined}
       >
         <span class="size-2 bg-navy-700" aria-hidden="true"></span>
         <span>Review Queue</span>
-        <span class="ml-auto bg-navy-800 px-2 py-0.5 font-mono text-[11px] text-white">
-          {pendingCount}
-        </span>
+        {pendingCount !== undefined && (
+          <span class="ml-auto bg-navy-800 px-2 py-0.5 font-mono text-[11px] text-white">
+            {pendingCount}
+          </span>
+        )}
+      </a>
+      <a
+        class:list={[
+          'flex flex-1 items-center gap-2 px-3 py-2 text-sm font-semibold lg:w-full',
+          currentPath === '/users' ? 'bg-blue-50 text-navy-800' : 'text-slate-600 hover:bg-slate-50',
+        ]}
+        href="/users"
+        aria-current={currentPath === '/users' ? 'page' : undefined}
+      >
+        <span class="size-2 bg-navy-700" aria-hidden="true"></span>
+        <span>Users / Access</span>
       </a>
     </div>
 
@@ -52,7 +69,7 @@ const { pendingCount } = Astro.props;
 
   <div class="min-w-0 flex-1">
     <header class="flex h-13 items-center border-b border-slate-200 bg-white px-5 lg:px-7">
-      <p class="text-sm text-slate-500">Operations <span class="px-2 text-slate-300">/</span> <b class="font-semibold text-slate-800">Review Queue</b></p>
+      <p class="text-sm text-slate-500">Operations <span class="px-2 text-slate-300">/</span> <b class="font-semibold text-slate-800">{currentPath === '/users' ? 'Users / Access' : 'Review Queue'}</b></p>
       <span class="ml-auto border border-amber-200 bg-amber-50 px-2 py-1 font-mono text-[10px] font-semibold uppercase text-amber-800">
         DEV
       </span>

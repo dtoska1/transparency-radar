@@ -1,4 +1,5 @@
 import { assertAdminSessionSecret } from './auth/config.js';
+import { assertGoogleOAuthConfig } from './auth/google.js';
 
 const SUPPORTED_STORAGE_ADAPTER = 'local';
 const DEFAULT_DEV_TRUST_PROXY_HOPS = 1;
@@ -77,6 +78,7 @@ export function validateApiRuntimeConfig(env: NodeJS.ProcessEnv = process.env): 
   }
 
   assertAdminSessionSecret(env);
+  assertGoogleOAuthConfig(env);
 
   const storageAdapter = requireValue(env, 'STORAGE_ADAPTER');
   if (storageAdapter !== SUPPORTED_STORAGE_ADAPTER) {

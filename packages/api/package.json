@@ -16,6 +16,7 @@
     "@sentry/node": "^8.47.0",
     "@tra/db": "workspace:*",
     "@tra/shared": "workspace:*",
+    "arctic": "^3.7.0",
     "cors": "^2.8.5",
     "drizzle-orm": "^0.38.3",
     "express": "^5.0.1",

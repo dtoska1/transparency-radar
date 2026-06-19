@@ -1,0 +1,155 @@
+---
+import AdminShell from '../components/AdminShell.astro';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { parseAllowlistNotice } from '../lib/allowlistActions';
+import { adminApiFetch, relaySetCookies } from '../lib/apiClient';
+
+interface AllowlistRow {
+  id: string;
+  email: string;
+  added_by: string | null;
+  created_at: string;
+}
+
+interface AdminRow {
+  id: string;
+  email: string;
+  disabled_at: string | null;
+  created_at: string;
+}
+
+let authenticated = false;
+let serviceUnavailable = false;
+let allowlist: AllowlistRow[] = [];
+let admins: AdminRow[] = [];
+const notice = parseAllowlistNotice(Astro.url.searchParams);
+
+try {
+  const response = await adminApiFetch('/api/admin/allowlist', {
+    cookieHeader: Astro.request.headers.get('cookie'),
+  });
+  relaySetCookies(response, Astro.response.headers);
+
+  if (response.status === 401) {
+    return Astro.redirect('/login');
+  }
+
+  if (response.ok) {
+    const body = (await response.json()) as { allowlist: AllowlistRow[]; admins: AdminRow[] };
+    allowlist = body.allowlist;
+    admins = body.admins;
+    authenticated = true;
+  } else {
+    serviceUnavailable = true;
+  }
+} catch {
+  serviceUnavailable = true;
+}
+---
+
+<BaseLayout title="Users / Access">
+  {
+    authenticated ? (
+      <AdminShell>
+        <main class="mx-auto max-w-3xl px-4 py-6 sm:px-6 lg:px-8">
+          <header class="mb-5">
+            <h1 class="text-xl font-semibold text-navy-950">Users / Access</h1>
+            <p class="mt-1 text-sm text-slate-500">
+              Anyone with a verified @csdgalbania.org Google account signs in automatically.
+              Add other emails here as one-off exceptions.
+            </p>
+          </header>
+
+          {notice && (
+            <div
+              class:list={[
+                'mb-4 border px-4 py-3 text-sm font-medium',
+                notice.kind === 'success' && 'border-emerald-200 bg-emerald-50 text-emerald-800',
+                notice.kind === 'warning' && 'border-amber-200 bg-amber-50 text-amber-800',
+                notice.kind === 'error' && 'border-rose-200 bg-rose-50 text-rose-800',
+              ]}
+              role="status"
+            >
+              {notice.text}
+            </div>
+          )}
+
+          <section class="mb-8 border border-slate-200 bg-white shadow-sm">
+            <div class="border-b border-slate-200 px-5 py-3">
+              <h2 class="text-sm font-semibold text-navy-950">Allowlisted emails</h2>
+            </div>
+
+            <form class="flex items-end gap-3 border-b border-slate-200 px-5 py-4" method="post" action="/api/allowlist-add">
+              <label class="block flex-1">
+                <span class="mb-1 block text-[10px] font-semibold uppercase text-slate-500">Email</span>
+                <input
+                  class="h-9 w-full border border-slate-300 bg-white px-3 text-sm outline-none focus:border-navy-700"
+                  type="email"
+                  name="email"
+                  placeholder="name@example.com"
+                  required
+                />
+              </label>
+              <button class="h-9 bg-navy-800 px-4 text-sm font-semibold text-white hover:bg-navy-700" type="submit">
+                Add
+              </button>
+            </form>
+
+            {allowlist.length > 0 ? (
+              <table class="w-full text-left text-sm">
+                <tbody>
+                  {allowlist.map((row) => (
+                    <tr class="border-b border-slate-100 last:border-b-0">
+                      <td class="px-5 py-3 font-medium text-slate-800">{row.email}</td>
+                      <td class="px-5 py-3 text-right">
+                        <form method="post" action="/api/allowlist-remove">
+                          <input type="hidden" name="id" value={row.id} />
+                          <button
+                            class="border border-rose-300 bg-white px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50"
+                            type="submit"
+                          >
+                            Remove
+                          </button>
+                        </form>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p class="px-5 py-4 text-sm text-slate-500">No manual exceptions yet.</p>
+            )}
+          </section>
+
+          <section class="border border-slate-200 bg-white shadow-sm">
+            <div class="border-b border-slate-200 px-5 py-3">
+              <h2 class="text-sm font-semibold text-navy-950">Current admins</h2>
+            </div>
+            <table class="w-full text-left text-sm">
+              <tbody>
+                {admins.map((admin) => (
+                  <tr class="border-b border-slate-100 last:border-b-0">
+                    <td class="px-5 py-3 font-medium text-slate-800">{admin.email}</td>
+                    <td class="px-5 py-3 text-right text-xs text-slate-500">
+                      {admin.disabled_at ? 'Disabled' : 'Active'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        </main>
+      </AdminShell>
+    ) : (
+      serviceUnavailable && (
+        <main class="grid min-h-screen place-items-center px-6 py-12">
+          <section class="w-full max-w-md border border-slate-200 bg-white px-6 py-8">
+            <p class="text-sm font-semibold text-navy-700">Radari Vendor</p>
+            <h1 class="mt-2 text-2xl font-semibold">Admin unavailable</h1>
+            <p class="mt-3 text-sm text-slate-600">The admin service could not be reached.</p>
+          </section>
+        </main>
+      )
+    )
+  }
+</BaseLayout>
