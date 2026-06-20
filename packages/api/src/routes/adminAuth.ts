@@ -11,7 +11,7 @@ import {
 } from '../auth/cookies.js';
 import { DUMMY_ARGON2ID_HASH, DUMMY_LOGIN_PASSWORD, verifyPasswordHash } from '../auth/password.js';
 import { createSession, invalidateSession } from '../auth/session.js';
-import { handleGoogleCallback, handleGoogleStart } from './adminAuthGoogle.js';
+import { handleMicrosoftCallback, handleMicrosoftStart } from './adminAuthMicrosoft.js';
 
 const LoginBodySchema = z
   .object({
@@ -86,7 +86,7 @@ export function createAdminAuthRouter(): Router {
   const router = Router();
   router.post('/login', handleAdminLogin);
   router.post('/logout', handleAdminLogout);
-  router.get('/google', handleGoogleStart);
-  router.get('/google/callback', handleGoogleCallback);
+  router.get('/microsoft', handleMicrosoftStart);
+  router.get('/microsoft/callback', handleMicrosoftCallback);
   return router;
 }

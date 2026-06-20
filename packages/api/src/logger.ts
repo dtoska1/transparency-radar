@@ -10,7 +10,7 @@ const redact = {
 
 const SENSITIVE_QUERY_PARAMS = ['code', 'state'];
 
-// pino's path-based `redact` can't reach inside a URL string, but the Google
+// pino's path-based `redact` can't reach inside a URL string, but the Microsoft
 // OAuth callback carries the one-time authorization code and CSRF state as
 // query params on req.url — strip those before the request serializer logs it.
 export function redactSensitiveQueryParams(url: string): string {

@@ -4,7 +4,7 @@ import { getAdminApiBaseUrl } from '../lib/apiClient';
 
 const loginFailed = Astro.url.searchParams.has('error');
 const notAuthorized = Astro.url.searchParams.get('error') === 'not_authorized';
-const googleSignInUrl = new URL('/api/admin/auth/google', getAdminApiBaseUrl()).toString();
+const microsoftSignInUrl = new URL('/api/admin/auth/microsoft', getAdminApiBaseUrl()).toString();
 ---
 
 <BaseLayout title="Sign in">
@@ -18,7 +18,7 @@ const googleSignInUrl = new URL('/api/admin/auth/google', getAdminApiBaseUrl()).
         loginFailed && (
           <p class="mt-6 border-l-2 border-red-600 bg-red-50 px-4 py-3 text-sm text-red-800">
             {notAuthorized
-              ? "That Google account isn't authorized for admin access."
+              ? "That Microsoft account isn't authorized for admin access."
               : 'Sign in failed. Check your credentials and try again.'}
           </p>
         )
@@ -26,9 +26,9 @@ const googleSignInUrl = new URL('/api/admin/auth/google', getAdminApiBaseUrl()).
 
       <a
         class="mt-8 flex w-full items-center justify-center gap-2 border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-800 hover:bg-slate-50"
-        href={googleSignInUrl}
+        href={microsoftSignInUrl}
       >
-        Sign in with Google
+        Sign in with Microsoft
       </a>
 
       <div class="my-6 flex items-center gap-3 text-xs text-slate-400">

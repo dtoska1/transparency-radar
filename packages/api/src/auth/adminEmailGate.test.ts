@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isAllowedAdminEmail, isCsdgDomainEmail } from './googleGate.js';
+import { isAllowedAdminEmail, isCsdgDomainEmail } from './adminEmailGate.js';
 
 describe('isCsdgDomainEmail', () => {
   it('allows an exact @csdgalbania.org email', () => {

@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { redactSensitiveQueryParams } from './logger.js';
 
 describe('redactSensitiveQueryParams', () => {
-  it('redacts both the Google OAuth authorization code and the CSRF state param', () => {
+  it('redacts both the Microsoft OAuth authorization code and the CSRF state param', () => {
     expect(
       redactSensitiveQueryParams(
-        '/api/admin/auth/google/callback?state=secret-state&code=secret-code',
+        '/api/admin/auth/microsoft/callback?state=secret-state&code=secret-code',
       ),
-    ).toBe('/api/admin/auth/google/callback?state=%5Bredacted%5D&code=%5Bredacted%5D');
+    ).toBe('/api/admin/auth/microsoft/callback?state=%5Bredacted%5D&code=%5Bredacted%5D');
   });
 
   it('leaves URLs without sensitive params untouched', () => {

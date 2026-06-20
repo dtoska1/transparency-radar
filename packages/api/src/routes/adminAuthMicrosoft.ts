@@ -2,9 +2,13 @@ import { randomBytes } from 'node:crypto';
 import { admin_allowlist, admin_users, db } from '@tra/db';
 import { eq } from 'drizzle-orm';
 import type { RequestHandler } from 'express';
+import { isAllowedAdminEmail } from '../auth/adminEmailGate.js';
 import { serializeSessionCookie } from '../auth/cookies.js';
-import { createGoogleAuthorizationURL, exchangeGoogleCode } from '../auth/google.js';
-import { isAllowedAdminEmail } from '../auth/googleGate.js';
+import {
+  assertMicrosoftOAuthConfig,
+  createMicrosoftAuthorizationURL,
+  exchangeMicrosoftCode,
+} from '../auth/microsoft.js';
 import {
   getOAuthStateCookie,
   serializeClearOAuthStateCookie,
@@ -17,7 +21,7 @@ import { getAllowedOrigins } from '../config.js';
 const LOGIN_FAILURE_REDIRECT = '/login?error=not_authorized';
 const LOGIN_SUCCESS_REDIRECT = '/';
 
-// The browser is on the API's origin when this completes (Google redirected here
+// The browser is on the API's origin when this completes (Microsoft redirected here
 // directly), but the admin UI lives on a different origin — build an absolute URL
 // from the first configured admin origin so the redirect lands on the right host.
 function resolveAdminUiRedirect(path: string, env: NodeJS.ProcessEnv = process.env): string {
@@ -25,12 +29,12 @@ function resolveAdminUiRedirect(path: string, env: NodeJS.ProcessEnv = process.e
   return origin ? new URL(path, origin).toString() : path;
 }
 
-export const handleGoogleStart: RequestHandler = (_req, res) => {
-  let authRequest: ReturnType<typeof createGoogleAuthorizationURL>;
+export const handleMicrosoftStart: RequestHandler = (_req, res) => {
+  let authRequest: ReturnType<typeof createMicrosoftAuthorizationURL>;
   try {
-    authRequest = createGoogleAuthorizationURL();
+    authRequest = createMicrosoftAuthorizationURL();
   } catch {
-    res.status(500).json({ error: 'Google sign-in is not configured' });
+    res.status(500).json({ error: 'Microsoft sign-in is not configured' });
     return;
   }
 
@@ -60,38 +64,50 @@ async function findOrCreateAdminByEmail(email: string): Promise<{ id: string }> 
   return { id };
 }
 
-function rejectGoogleLogin(res: Parameters<RequestHandler>[1]): void {
+function rejectMicrosoftLogin(res: Parameters<RequestHandler>[1]): void {
   res.setHeader('Set-Cookie', serializeClearOAuthStateCookie());
   res.redirect(resolveAdminUiRedirect(LOGIN_FAILURE_REDIRECT));
 }
 
-export const handleGoogleCallback: RequestHandler = async (req, res) => {
+export const handleMicrosoftCallback: RequestHandler = async (req, res) => {
   const stored = getOAuthStateCookie(req.headers.cookie);
   const queryState = typeof req.query.state === 'string' ? req.query.state : undefined;
   const code = typeof req.query.code === 'string' ? req.query.code : undefined;
 
   if (!stored || !queryState || !code || stored.state !== queryState) {
-    rejectGoogleLogin(res);
+    rejectMicrosoftLogin(res);
     return;
   }
 
-  let claims: Awaited<ReturnType<typeof exchangeGoogleCode>>;
+  let claims: Awaited<ReturnType<typeof exchangeMicrosoftCode>>;
   try {
-    claims = await exchangeGoogleCode(code, stored.codeVerifier);
+    claims = await exchangeMicrosoftCode(code, stored.codeVerifier);
   } catch {
-    rejectGoogleLogin(res);
+    rejectMicrosoftLogin(res);
     return;
   }
 
-  if (claims.email_verified !== true || !claims.email) {
-    rejectGoogleLogin(res);
+  const { tenantId } = assertMicrosoftOAuthConfig();
+  if (claims.tid !== tenantId) {
+    rejectMicrosoftLogin(res);
     return;
   }
 
-  const email = claims.email.toLowerCase();
+  if (claims.email_verified !== true) {
+    rejectMicrosoftLogin(res);
+    return;
+  }
+
+  const rawEmail = claims.email ?? claims.preferred_username;
+  if (!rawEmail || !rawEmail.includes('@')) {
+    rejectMicrosoftLogin(res);
+    return;
+  }
+  const email = rawEmail.toLowerCase();
+
   const allowlist = await findAllowlistedEmails();
   if (!isAllowedAdminEmail(email, allowlist)) {
-    rejectGoogleLogin(res);
+    rejectMicrosoftLogin(res);
     return;
   }
 
