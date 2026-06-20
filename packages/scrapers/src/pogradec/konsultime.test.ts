@@ -8,7 +8,24 @@ vi.mock('@tra/db', () => ({
   sources: {},
 }));
 
-import { classifyKind, parseListingDate } from './konsultime.js';
+import { classifyKind, parseListingDate, parsePogradecKonsultimeHtml } from './konsultime.js';
+
+function card(slug: string, title: string, excerpt: string, date: string): string {
+  return `
+    <article>
+      <section>
+        <h3 class="grid-title">
+          <a href="/publikime/konsultim-publik-10/${slug}/">${title}</a>
+        </h3>
+        <p>${excerpt}</p>
+      </section>
+      <section>
+        <span>Kategori</span>
+        <span>${date}</span>
+      </section>
+    </article>
+  `;
+}
 
 describe('parseListingDate', () => {
   it('converts DD-MM-YYYY to ISO YYYY-MM-DD', () => {
@@ -47,5 +64,40 @@ describe('classifyKind', () => {
 
   it('returns consultation_notice as default', () => {
     expect(classifyKind('Konsultim Publik mbi Planin', '')).toBe('consultation_notice');
+  });
+});
+
+describe('parsePogradecKonsultimeHtml', () => {
+  it('extracts representative cards, ignores old rows, and finds explicit DD-MM-YYYY dates', () => {
+    const html = `
+      <main>
+        ${card(
+          'konsultim-publik-900',
+          'Konsultim Publik për Projekt-Buxhetin 2025',
+          'Njoftim për konsultimin publik të projekt-buxhetit.',
+          '20-11-2025',
+        )}
+        ${card('konsultim-publik-899', 'Dëgjesë Publike për Transportin', 'Degjes publike.', '15-03-2024')}
+        ${card('konsultim-publik-898', 'Projektvendim për Taksat Vendore', 'Projektvendim për konsultim.', '05-06-2023')}
+        ${card('konsultim-publik-897', 'Konsultim Publik për Arsimin', 'Material konsultimi.', '11-07-2023')}
+        ${card('konsultim-publik-896', 'Konsultim Publik për Sportin', 'Njoftim konsultimi.', '12-08-2023')}
+        ${card('konsultim-publik-895', 'Konsultim Publik për Kulturën', 'Thirrje për komente.', '13-09-2023')}
+        ${card('konsultim-publik-894', 'Konsultim Publik për Turizmin', 'Takim konsultues.', '14-10-2023')}
+        ${card('konsultim-publik-893', 'Konsultim Publik për Mjedisin', 'Projekt akt për diskutim.', '15-11-2023')}
+        ${card('konsultim-publik-700', 'Konsultim i Vjetër Publik', 'Duhet të filtrohet.', '22-12-2022')}
+      </main>
+    `;
+
+    const items = parsePogradecKonsultimeHtml(html);
+
+    expect(items).toHaveLength(8);
+    expect(items.some((item) => item.title === 'Konsultim i Vjetër Publik')).toBe(false);
+    expect(items[0]).toEqual({
+      title: 'Konsultim Publik për Projekt-Buxhetin 2025',
+      sourceUrl:
+        'https://bashkiapogradec.gov.al/publikime/konsultim-publik-10/konsultim-publik-900/',
+      excerpt: 'Njoftim për konsultimin publik të projekt-buxhetit.',
+      publishedDate: '2025-11-20',
+    });
   });
 });

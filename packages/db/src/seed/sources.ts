@@ -133,9 +133,8 @@ const SOURCE_DEFINITIONS: SourceDef[] = [
     vertical: 'konsultime',
     source_origin: 'bashkiapogradec.gov.al',
     source_page_url:
-      'https://bashkiapogradec.gov.al/publikime-kategori/njoftime-te-keshillit-bashkiak-12',
-    notes:
-      'Council notices listing — filter by keyword "konsultim publik"; exclude dead Bashkitë e Forta link',
+      'https://bashkiapogradec.gov.al/publikime-kategori/konsultim-publik-10/',
+    notes: 'Confirmed official single-page Konsultime listing; no pagination in v1',
   },
   {
     slug: 'pogradec',

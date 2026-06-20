@@ -9,6 +9,7 @@ import { BaseScraper } from '../base-scraper.js';
 const LISTING_URL = 'https://bashkiapogradec.gov.al/publikime-kategori/konsultim-publik-10/';
 const SOURCE_ORIGIN = 'bashkiapogradec.gov.al';
 const YEAR_FLOOR = 2023;
+const LISTING_DATE_RE = /\b\d{2}-\d{2}-\d{4}\b/;
 
 const HTTP_HEADERS = {
   'User-Agent': 'TransparencyRadar/0.1 (+contact@transparency-radar.al)',
@@ -19,9 +20,9 @@ const HTTP_HEADERS = {
 
 /** Converts DD-MM-YYYY listing date to ISO YYYY-MM-DD without constructing a JS Date. */
 export function parseListingDate(raw: string): string | null {
-  const m = raw.trim().match(/(\d{2})-(\d{2})-(\d{4})/);
-  if (!m) return null;
-  const [, dd, mm, yyyy] = m as [string, string, string, string];
+  const match = raw.match(LISTING_DATE_RE);
+  if (!match) return null;
+  const [dd, mm, yyyy] = match[0].split('-') as [string, string, string];
   return `${yyyy}-${mm}-${dd}`;
 }
 
@@ -37,14 +38,49 @@ export function classifyKind(
   return 'consultation_notice';
 }
 
-// ── Scraper ───────────────────────────────────────────────────────────────────
-
-interface CardEntry {
+export interface PogradecKonsultimeItem {
   title: string;
   sourceUrl: string;
   excerpt: string;
   publishedDate: string; // ISO YYYY-MM-DD
 }
+
+export function parsePogradecKonsultimeHtml(html: string): PogradecKonsultimeItem[] {
+  const $ = cheerio.load(html);
+  const cards: PogradecKonsultimeItem[] = [];
+  const seen = new Set<string>();
+
+  $('h3.grid-title a[href*="/publikime/konsultim-publik-10/"]').each((_i, el) => {
+    const $a = $(el);
+    const href = $a.attr('href') ?? '';
+    if (!href) return;
+    const sourceUrl = href.startsWith('http') ? href : new URL(href, LISTING_URL).toString();
+    if (seen.has(sourceUrl)) return;
+    seen.add(sourceUrl);
+
+    const title = $a.text().trim();
+    if (!title) return;
+
+    const $section = $a.closest('section');
+    const excerpt = $section.find('p').first().text().trim();
+    const nearbyText = [
+      $section.text(),
+      $section.next('section').text(),
+      $section.next('section').next('section').text(),
+    ].join(' ');
+    const publishedDate = parseListingDate(nearbyText);
+    if (!publishedDate) return;
+
+    const year = Number.parseInt(publishedDate.slice(0, 4), 10);
+    if (year < YEAR_FLOOR) return;
+
+    cards.push({ title, sourceUrl, excerpt, publishedDate });
+  });
+
+  return cards;
+}
+
+// ── Scraper ───────────────────────────────────────────────────────────────────
 
 interface ProcessResult {
   seen: number;
@@ -128,7 +164,7 @@ export class PogradecKonsultimeScraper extends BaseScraper {
     return { sourceId: found.sourceId, municipalityId: found.municipalityId };
   }
 
-  private async fetchListingCards(): Promise<CardEntry[]> {
+  private async fetchListingCards(): Promise<PogradecKonsultimeItem[]> {
     const res = await fetch(LISTING_URL, {
       headers: HTTP_HEADERS,
       signal: AbortSignal.timeout(30_000),
@@ -136,36 +172,7 @@ export class PogradecKonsultimeScraper extends BaseScraper {
     if (!res.ok) throw new Error(`Listing fetch failed: ${res.status} ${LISTING_URL}`);
     const html = await res.text();
 
-    const $ = cheerio.load(html);
-    const cards: CardEntry[] = [];
-    const seen = new Set<string>();
-
-    $('h3.grid-title a[href*="/publikime/konsultim-publik-10/"]').each((_i, el) => {
-      const $a = $(el);
-      const href = $a.attr('href') ?? '';
-      if (!href) return;
-      const sourceUrl = href.startsWith('http') ? href : new URL(href, LISTING_URL).toString();
-      if (seen.has(sourceUrl)) return;
-      seen.add(sourceUrl);
-
-      const title = $a.text().trim();
-      if (!title) return;
-
-      const $section = $a.closest('section');
-      const excerpt = $section.find('p').first().text().trim();
-      // Date lives in the immediately following sibling <section> (clock icon + <span>DD-MM-YYYY</span>)
-      const rawDate = $section.next('section').find('span').first().text().trim();
-      const publishedDate = parseListingDate(rawDate);
-      if (!publishedDate) {
-        this.logger.warn({ rawDate, sourceUrl }, 'Could not parse date — skipping card');
-        return;
-      }
-
-      const year = Number.parseInt(publishedDate.slice(0, 4), 10);
-      if (year < YEAR_FLOOR) return;
-
-      cards.push({ title, sourceUrl, excerpt, publishedDate });
-    });
+    const cards = parsePogradecKonsultimeHtml(html);
 
     if (cards.length === 0) {
       this.logger.error(
@@ -178,7 +185,7 @@ export class PogradecKonsultimeScraper extends BaseScraper {
   }
 
   private async insertKonsultim(
-    card: CardEntry,
+    card: PogradecKonsultimeItem,
     sourceId: string,
     municipalityId: string,
   ): Promise<ProcessResult> {
