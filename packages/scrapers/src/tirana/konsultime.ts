@@ -2,6 +2,7 @@ import { db } from '@tra/db';
 import { konsultime, municipalities, scrape_runs, sources } from '@tra/db';
 import { toSlug } from '@tra/shared';
 import * as cheerio from 'cheerio';
+import type { Element } from 'domhandler';
 import { and, eq } from 'drizzle-orm';
 import { fetch } from 'undici';
 import { BaseScraper } from '../base-scraper.js';
@@ -245,7 +246,7 @@ function normalizeRegisterUrl(href: string): string | null {
   return url.toString();
 }
 
-function parseAdjacentDate($: cheerio.CheerioAPI, el: cheerio.Element): string | null {
+function parseAdjacentDate($: cheerio.CheerioAPI, el: Element): string | null {
   const link = $(el);
   const candidates = [
     link.attr('title') ?? '',

@@ -75,8 +75,9 @@ export function parseDurresKonsultimeDetailHtml(
   const $ = cheerio.load(html);
   const jsonLd = extractJsonLdMetadata($);
   const title =
-    normalizeText($('h1.entry-title, h1.elementor-heading-title, .entry-title h1, h1').first().text()) ||
-    jsonLd.title;
+    normalizeText(
+      $('h1.entry-title, h1.elementor-heading-title, .entry-title h1, h1').first().text(),
+    ) || jsonLd.title;
   if (!title) return null;
 
   const visibleDateText = [
@@ -395,8 +396,5 @@ function normalizeText(value: string): string {
 }
 
 function foldText(value: string): string {
-  return normalizeText(value)
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase();
+  return normalizeText(value).normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 }

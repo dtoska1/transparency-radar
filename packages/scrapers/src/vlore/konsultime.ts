@@ -259,10 +259,7 @@ function isMeaningfulTitle(value: string): boolean {
   const normalized = normalizeText(value);
   if (normalized.length < 4) return false;
 
-  const folded = normalized
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase();
+  const folded = normalized.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
   if (folded.startsWith('http')) return false;
   return !new Set(['link', 'shkarko', 'download', 'ketu', 'kliko ketu', 'pdf']).has(folded);
 }

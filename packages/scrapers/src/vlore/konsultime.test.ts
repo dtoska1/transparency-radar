@@ -129,8 +129,7 @@ describe('parseVloreKonsultimeHtml', () => {
     });
     expect(items[3]).toMatchObject({
       title: 'Projekt akt për transportin',
-      sourceUrl:
-        'https://vlora.gov.al/wp-content/uploads/2023/11/projekt_akt_per_transportin.pdf',
+      sourceUrl: 'https://vlora.gov.al/wp-content/uploads/2023/11/projekt_akt_per_transportin.pdf',
       publishedDate: '2023-11-25',
     });
   });

@@ -81,7 +81,8 @@ const SOURCE_DEFINITIONS: SourceDef[] = [
     vertical: 'konsultime',
     source_origin: 'durres.gov.al',
     source_page_url: 'https://durres.gov.al/konsultimet-publike/',
-    notes: 'Official public consultations register — metadata v1 collects WordPress detail posts only',
+    notes:
+      'Official public consultations register — metadata v1 collects WordPress detail posts only',
   },
   {
     slug: 'durres',
@@ -132,8 +133,7 @@ const SOURCE_DEFINITIONS: SourceDef[] = [
     slug: 'pogradec',
     vertical: 'konsultime',
     source_origin: 'bashkiapogradec.gov.al',
-    source_page_url:
-      'https://bashkiapogradec.gov.al/publikime-kategori/konsultim-publik-10/',
+    source_page_url: 'https://bashkiapogradec.gov.al/publikime-kategori/konsultim-publik-10/',
     notes: 'Confirmed official single-page Konsultime listing; no pagination in v1',
   },
   {

@@ -71,8 +71,7 @@ describe('parseDurresKonsultimeDetailHtml', () => {
     );
 
     expect(item).toEqual({
-      title:
-        'Për Programin Buxhetor Afatmesëm 2027-2029, faza e parë, të bashkisë Durrës',
+      title: 'Për Programin Buxhetor Afatmesëm 2027-2029, faza e parë, të bashkisë Durrës',
       sourceUrl:
         'https://durres.gov.al/2026/06/08/per-programin-buxhetor-afatmesem-2027-2029-faza-e-pare-te-bashkise-durres/',
       publishedDate: '2026-06-08',
@@ -153,10 +152,7 @@ describe('parseDurresKonsultimeDetailHtml', () => {
       ),
     ).toBeNull();
     expect(
-      parseDurresKonsultimeDetailHtml(
-        '<h1>Njoftim pa datë</h1>',
-        'https://durres.gov.al/no-date/',
-      ),
+      parseDurresKonsultimeDetailHtml('<h1>Njoftim pa datë</h1>', 'https://durres.gov.al/no-date/'),
     ).toBeNull();
     expect(
       parseDurresKonsultimeDetailHtml(

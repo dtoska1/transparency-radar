@@ -311,8 +311,5 @@ function normalizeText(value: string): string {
 }
 
 function foldText(value: string): string {
-  return normalizeText(value)
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase();
+  return normalizeText(value).normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 }
