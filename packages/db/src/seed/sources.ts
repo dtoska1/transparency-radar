@@ -78,8 +78,8 @@ const SOURCE_DEFINITIONS: SourceDef[] = [
     slug: 'durres',
     vertical: 'konsultime',
     source_origin: 'durres.gov.al',
-    source_page_url: 'https://durres.gov.al/konsultimet-publike',
-    notes: 'Also covers projekt-akte register — confirm latest-published date before enabling',
+    source_page_url: 'https://durres.gov.al/konsultimet-publike/',
+    notes: 'Official public consultations register — metadata v1 collects WordPress detail posts only',
   },
   {
     slug: 'durres',

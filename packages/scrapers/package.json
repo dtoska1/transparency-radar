@@ -13,6 +13,7 @@
     "run:shkoder:vendime": "tsx src/shkoder/run.ts",
     "run:shkoder:konsultime": "tsx src/shkoder/run-konsultime.ts",
     "run:durres:vendime": "tsx src/durres/run.ts",
+    "run:durres:konsultime": "tsx src/durres/run-konsultime.ts",
     "run:tirana:vendime": "tsx src/tirana/run.ts",
     "run:vlore:vendime": "tsx src/vlore/run.ts",
     "run:vlore:konsultime": "tsx src/vlore/run-konsultime.ts",
