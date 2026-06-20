@@ -31,8 +31,10 @@ const SOURCE_DEFINITIONS: SourceDef[] = [
     slug: 'tirana',
     vertical: 'konsultime',
     source_origin: 'tirana.al',
-    source_page_url: 'https://tirana.al/kategori/konsultimi-publik',
-    notes: 'Bot detection (same domain) — requires Playwright',
+    source_page_url:
+      'https://tirana.al/kategoria-e-publikimit/regjistri-i-projekt-akteve-per-konsultim',
+    notes:
+      'Official project-act register document page; metadata v1 tracks the register document as kind=draft_act',
   },
   {
     slug: 'tirana',

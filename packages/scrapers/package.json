@@ -15,6 +15,7 @@
     "run:durres:vendime": "tsx src/durres/run.ts",
     "run:durres:konsultime": "tsx src/durres/run-konsultime.ts",
     "run:tirana:vendime": "tsx src/tirana/run.ts",
+    "run:tirana:konsultime": "tsx src/tirana/run-konsultime.ts",
     "run:vlore:vendime": "tsx src/vlore/run.ts",
     "run:vlore:konsultime": "tsx src/vlore/run-konsultime.ts",
     "run:prokurime": "tsx src/prokurime/runAppOfficial.ts"
