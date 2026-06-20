@@ -51,13 +51,12 @@ const SOURCE_DEFINITIONS: SourceDef[] = [
     notes: 'Multiple candidate listing pages — confirm canonical URL during scraper build',
   },
   {
-    // Exact listing path TBC — konsultimivendor.al is external/unofficial, do NOT use
     slug: 'shkoder',
     vertical: 'konsultime',
     source_origin: 'bashkiashkoder.gov.al',
-    source_page_url: 'https://bashkiashkoder.gov.al',
+    source_page_url: 'https://bashkiashkoder.gov.al/keshillim-me-publikun/',
     notes:
-      'Listing URL TBC — update source_page_url once confirmed; konsultimivendor.al is external/unofficial',
+      'Confirmed official paginated Konsultime feed; konsultimivendor.al is supplemental/unofficial only',
   },
   {
     slug: 'shkoder',

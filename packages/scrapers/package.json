@@ -11,6 +11,7 @@
     "run:pogradec:konsultime": "tsx src/pogradec/run-konsultime.ts",
     "run:pogradec:konsultime:documents": "tsx src/pogradec/run-konsultime-documents.ts",
     "run:shkoder:vendime": "tsx src/shkoder/run.ts",
+    "run:shkoder:konsultime": "tsx src/shkoder/run-konsultime.ts",
     "run:durres:vendime": "tsx src/durres/run.ts",
     "run:tirana:vendime": "tsx src/tirana/run.ts",
     "run:vlore:vendime": "tsx src/vlore/run.ts",
