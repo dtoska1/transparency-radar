@@ -93,6 +93,14 @@ export const handleMicrosoftCallback: RequestHandler = async (req, res) => {
     return;
   }
 
+  // `email_verified` (per OIDC) attests to the `email` claim specifically, not to
+  // `preferred_username`. We require it === true here, then fall back to
+  // preferred_username only when `email` is absent. On that fallback path the
+  // verified flag did not cover the value we use — but the single-tenant `tid`
+  // check above plus the @csdgalbania.org domain gate below guarantee the UPN is a
+  // verified-directory CSDG identity, so the residual risk is acceptable for this
+  // internal admin tool. Do not relax the tenant or domain checks on the assumption
+  // that email_verified alone is sufficient.
   if (claims.email_verified !== true) {
     rejectMicrosoftLogin(res);
     return;
