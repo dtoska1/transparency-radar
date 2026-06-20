@@ -27,14 +27,9 @@ export function parseListingDate(raw: string): string | null {
 }
 
 /** Classifies a konsultime item based on title and excerpt text. */
-export function classifyKind(
-  title: string,
-  excerpt: string,
-): 'hearing' | 'draft_act' | 'consultation_notice' {
-  const text = `${title} ${excerpt}`.toLowerCase();
-  if (text.includes('dëgjes') || text.includes('degjes')) return 'hearing';
-  if (text.includes('projekt') && (text.includes('akt') || text.includes('vendim')))
-    return 'draft_act';
+export function classifyKind(title: string, excerpt: string): 'hearing' | 'consultation_notice' {
+  const text = foldText(`${title} ${excerpt}`);
+  if (text.includes('degjes')) return 'hearing';
   return 'consultation_notice';
 }
 
@@ -207,7 +202,6 @@ export class PogradecKonsultimeScraper extends BaseScraper {
         summary: card.excerpt || null,
         published_date: card.publishedDate,
         kind,
-        review_status: 'pending',
         is_unofficial_proxy: false,
         collected_at: new Date(),
       })
@@ -222,4 +216,8 @@ export class PogradecKonsultimeScraper extends BaseScraper {
     this.logger.info({ dedupKey, kind }, 'Inserted konsultim');
     return { seen: 1, created: 1 };
   }
+}
+
+function foldText(value: string): string {
+  return value.replace(/\s+/g, ' ').trim().normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
 }

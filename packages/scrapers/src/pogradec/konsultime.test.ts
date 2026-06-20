@@ -54,12 +54,12 @@ describe('classifyKind', () => {
     expect(classifyKind('Konsultim', 'degjes publike')).toBe('hearing');
   });
 
-  it('returns draft_act when title contains projekt and akt', () => {
-    expect(classifyKind('Projekt-Akt për Buxhetin', '')).toBe('draft_act');
+  it('returns consultation_notice when title contains projekt and akt', () => {
+    expect(classifyKind('Projekt-Akt për Buxhetin', '')).toBe('consultation_notice');
   });
 
-  it('returns draft_act when title contains projekt and vendim', () => {
-    expect(classifyKind('Projektvendim nr.5', '')).toBe('draft_act');
+  it('returns consultation_notice when title contains projekt and vendim', () => {
+    expect(classifyKind('Projektvendim nr.5', '')).toBe('consultation_notice');
   });
 
   it('returns consultation_notice as default', () => {
