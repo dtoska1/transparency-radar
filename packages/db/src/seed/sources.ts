@@ -101,13 +101,12 @@ const SOURCE_DEFINITIONS: SourceDef[] = [
     notes: 'Official site has no real feed — redirects to vendime.al; only proxy in v1',
   },
   {
-    // Not a clean open-consultation feed: draft acts + public hearings interleaved
     slug: 'vlore',
     vertical: 'konsultime',
     source_origin: 'vlora.gov.al',
     source_page_url:
-      'https://vlora.gov.al/regjistri-i-projekt-akteve-per-konsultim-publik-te-keshillit-bashkiak',
-    notes: 'Contains draft acts and public hearings — set kind per row (draft_act / hearing)',
+      'https://vlora.gov.al/regjistri-i-projekt-akteve-per-konsultim-publik-te-keshillit-bashkiak/',
+    notes: 'Official project-act register for public consultation — scraper stores kind=draft_act',
   },
   {
     slug: 'vlore',
