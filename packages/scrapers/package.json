@@ -18,6 +18,7 @@
     "run:durres:konsultime:documents": "tsx src/durres/run-konsultime-documents.ts",
     "run:tirana:vendime": "tsx src/tirana/run.ts",
     "run:tirana:konsultime": "tsx src/tirana/run-konsultime.ts",
+    "run:tirana:konsultime:documents": "tsx src/tirana/run-konsultime-documents.ts",
     "run:vlore:vendime": "tsx src/vlore/run.ts",
     "run:vlore:konsultime": "tsx src/vlore/run-konsultime.ts",
     "run:vlore:konsultime:documents": "tsx src/vlore/run-konsultime-documents.ts",
