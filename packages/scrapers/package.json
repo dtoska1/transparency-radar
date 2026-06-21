@@ -20,6 +20,7 @@
     "run:tirana:konsultime": "tsx src/tirana/run-konsultime.ts",
     "run:vlore:vendime": "tsx src/vlore/run.ts",
     "run:vlore:konsultime": "tsx src/vlore/run-konsultime.ts",
+    "run:vlore:konsultime:documents": "tsx src/vlore/run-konsultime-documents.ts",
     "run:prokurime": "tsx src/prokurime/runAppOfficial.ts"
   },
   "dependencies": {
