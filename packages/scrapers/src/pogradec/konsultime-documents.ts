@@ -7,7 +7,17 @@ import {
   konsultime,
   municipalities,
 } from '@tra/db';
-import { LocalDiskAdapter, deriveDocFormat, hashBytes, requestTimestamp } from '@tra/shared';
+import {
+  type AllowedDocumentExt,
+  LocalDiskAdapter,
+  assertDevDatabase,
+  buildContentAddressedStorageKey,
+  deriveDocFormat,
+  hashBytes,
+  requestTimestamp,
+  resolveVersionDecision,
+  validateDocumentBytes,
+} from '@tra/shared';
 import * as cheerio from 'cheerio';
 import { and, desc, eq } from 'drizzle-orm';
 import { fetch } from 'undici';
@@ -17,14 +27,11 @@ const SOURCE_ORIGIN = 'bashkiapogradec.gov.al';
 const DETAIL_URL_PREFIX = 'https://bashkiapogradec.gov.al/publikime/konsultim-publik-10/';
 const DOCUMENT_PATH_PREFIX = '/ngarkime/njoftimet/docs/';
 const MAX_DOCUMENT_BYTES = 50 * 1024 * 1024;
-const LOCAL_DATABASE_HOSTS = new Set(['localhost', '127.0.0.1', 'postgres']);
 
 const HTTP_HEADERS = {
   'User-Agent': 'TransparencyRadar/0.1 (+contact@transparency-radar.al)',
   'Accept-Language': 'sq-AL,sq;q=0.9,en;q=0.8',
 };
-
-type AllowedDocumentExt = 'pdf' | 'doc' | 'docx';
 
 interface DocumentFormat {
   ext: AllowedDocumentExt;
@@ -65,12 +72,6 @@ interface DocumentRecord {
 interface VersionRecord {
   created: boolean;
   id: string;
-}
-
-interface LatestVersion {
-  document_id: string;
-  id: string;
-  version_no: number;
 }
 
 export interface LinkAuditInput {
@@ -123,28 +124,6 @@ interface DocumentProcessResult {
   skipped: boolean;
   stored: boolean;
   versionCreated: boolean;
-}
-
-export type VersionDecision =
-  | { action: 'insert'; versionNo: number }
-  | { action: 'reuse'; id: string }
-  | { action: 'version'; versionNo: number };
-
-export function assertDevDatabase(databaseUrl = process.env.DATABASE_URL): void {
-  if (!databaseUrl) throw new Error('DATABASE_URL is required');
-
-  let hostname = '';
-  try {
-    hostname = new URL(databaseUrl).hostname;
-  } catch {
-    throw new Error('DATABASE_URL is not a valid URL');
-  }
-
-  if (!LOCAL_DATABASE_HOSTS.has(hostname)) {
-    throw new Error(
-      'Pogradec konsultime document enrichment is DEV-only; refusing non-local DATABASE_URL host',
-    );
-  }
 }
 
 export function isOfficialPogradecKonsultimeDetailUrl(value: string): boolean {
@@ -201,39 +180,6 @@ export function getAllowedDocumentFormat(sourceUrl: string): DocumentFormat | nu
   return { ext: format.ext, mime: format.mime };
 }
 
-export function buildContentAddressedStorageKey(sha256: string, ext: AllowedDocumentExt): string {
-  if (!/^[a-f0-9]{64}$/.test(sha256)) throw new Error('Invalid sha256 for storage key');
-  return `pogradec/konsultime/${sha256}.${ext}`;
-}
-
-export function validateDocumentBytes(bytes: Buffer, ext: AllowedDocumentExt): void {
-  if (bytes.length > MAX_DOCUMENT_BYTES) {
-    throw new Error('Document exceeds max size of 50 MB');
-  }
-
-  if (ext === 'pdf' && hasPrefix(bytes, [0x25, 0x50, 0x44, 0x46, 0x2d])) return;
-  if (ext === 'doc' && hasPrefix(bytes, [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1])) return;
-  if (
-    ext === 'docx' &&
-    (hasPrefix(bytes, [0x50, 0x4b, 0x03, 0x04]) ||
-      hasPrefix(bytes, [0x50, 0x4b, 0x05, 0x06]) ||
-      hasPrefix(bytes, [0x50, 0x4b, 0x07, 0x08]))
-  ) {
-    return;
-  }
-
-  throw new Error(`Document magic bytes do not match .${ext}`);
-}
-
-export function resolveVersionDecision(
-  latest: LatestVersion | null | undefined,
-  documentId: string,
-): VersionDecision {
-  if (!latest) return { action: 'insert', versionNo: 1 };
-  if (latest.document_id === documentId) return { action: 'reuse', id: latest.id };
-  return { action: 'version', versionNo: latest.version_no + 1 };
-}
-
 export class PogradecKonsultimeDocumentEnricher extends BaseScraper {
   private readonly delayFn: (ms: number) => Promise<void>;
   private readonly fetchImpl: FetchLike;
@@ -258,7 +204,7 @@ export class PogradecKonsultimeDocumentEnricher extends BaseScraper {
   }
 
   async runWithStats(): Promise<EnrichmentStats> {
-    assertDevDatabase();
+    assertDevDatabase(undefined, 'Pogradec konsultime document enrichment');
 
     const rows = await this.repository.loadKonsultimeRows();
     const totals = emptyStats();
@@ -347,7 +293,12 @@ export class PogradecKonsultimeDocumentEnricher extends BaseScraper {
     validateDocumentBytes(bytes, format.ext);
 
     const sha256 = this.hash(bytes);
-    const storageKey = buildContentAddressedStorageKey(sha256, format.ext);
+    const storageKey = buildContentAddressedStorageKey(
+      'pogradec',
+      'konsultime',
+      sha256,
+      format.ext,
+    );
     await this.storage.upload(storageKey, bytes, format.mime);
 
     const document = await this.repository.upsertDocument(
@@ -531,11 +482,6 @@ class DrizzleEnrichmentRepository implements EnrichmentRepository {
 
 function normalizeText(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
-}
-
-function hasPrefix(bytes: Buffer, prefix: readonly number[]): boolean {
-  if (bytes.length < prefix.length) return false;
-  return prefix.every((byte, index) => bytes[index] === byte);
 }
 
 async function readResponseBodyWithLimit(res: Response, maxBytes: number): Promise<Buffer> {

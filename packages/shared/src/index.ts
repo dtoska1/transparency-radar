@@ -36,3 +36,15 @@ export type {
 } from './tamper/index.js';
 export { toSlug } from './slug.js';
 export { classifyDocType, type KonsultimeDocType } from './classifyDocType.js';
+export {
+  assertDevDatabase,
+  buildContentAddressedStorageKey,
+  resolveVersionDecision,
+  validateDocumentBytes,
+  MAX_DOCUMENT_BYTES,
+} from './document-enrichment/index.js';
+export type {
+  AllowedDocumentExt,
+  LatestVersion,
+  VersionDecision,
+} from './document-enrichment/index.js';

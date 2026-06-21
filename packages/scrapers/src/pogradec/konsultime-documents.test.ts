@@ -22,13 +22,9 @@ import {
   type LinkAuditInput,
   PogradecKonsultimeDocumentEnricher,
   type StorageLike,
-  assertDevDatabase,
-  buildContentAddressedStorageKey,
   extractPogradecKonsultimeDocumentLinks,
   getAllowedDocumentFormat,
   isOfficialPogradecKonsultimeDetailUrl,
-  resolveVersionDecision,
-  validateDocumentBytes,
 } from './konsultime-documents.js';
 
 const DETAIL_URL =
@@ -95,10 +91,6 @@ function validPdf(): Buffer {
   return Buffer.from('%PDF-valid fixture', 'utf8');
 }
 
-function validDoc(): Buffer {
-  return Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0x00]);
-}
-
 function validDocx(): Buffer {
   return Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00]);
 }
@@ -145,20 +137,6 @@ describe('Pogradec konsultime document validation', () => {
     expect(
       getAllowedDocumentFormat('https://bashkiapogradec.gov.al/ngarkime/njoftimet/docs/table.xlsx'),
     ).toBeNull();
-  });
-
-  it('verifies magic bytes for allowed formats', () => {
-    expect(() => validateDocumentBytes(validPdf(), 'pdf')).not.toThrow();
-    expect(() => validateDocumentBytes(validDoc(), 'doc')).not.toThrow();
-    expect(() => validateDocumentBytes(validDocx(), 'docx')).not.toThrow();
-    expect(() => validateDocumentBytes(Buffer.from('not a pdf'), 'pdf')).toThrow(/magic bytes/);
-  });
-
-  it('builds hash-derived storage keys and rejects unsafe hash input', () => {
-    const key = buildContentAddressedStorageKey(SHA256, 'pdf');
-    expect(key).toBe(`pogradec/konsultime/${SHA256}.pdf`);
-    expect(key).not.toContain('..');
-    expect(() => buildContentAddressedStorageKey('../bad', 'pdf')).toThrow(/Invalid sha256/);
   });
 
   it('rejects oversized downloads before storing', async () => {
@@ -247,23 +225,5 @@ describe('Pogradec konsultime document integrity behavior', () => {
     expect(stats.documentsFailed).toBe(1);
     expect(stats.documentsStored).toBe(1);
     expect(storage.uploads).toHaveLength(1);
-  });
-
-  it('models unchanged and changed bytes at the same URL', () => {
-    expect(resolveVersionDecision(null, 'doc-1')).toEqual({ action: 'insert', versionNo: 1 });
-    expect(
-      resolveVersionDecision({ id: 'v1', document_id: 'doc-1', version_no: 1 }, 'doc-1'),
-    ).toEqual({ action: 'reuse', id: 'v1' });
-    expect(
-      resolveVersionDecision({ id: 'v1', document_id: 'doc-1', version_no: 1 }, 'doc-2'),
-    ).toEqual({ action: 'version', versionNo: 2 });
-  });
-
-  it('keeps the enrichment DEV-only by default', () => {
-    expect(() => assertDevDatabase('postgresql://tra:tra_dev@localhost:5432/tra')).not.toThrow();
-    expect(() => assertDevDatabase('postgresql://tra:tra_dev@postgres:5432/tra')).not.toThrow();
-    expect(() => assertDevDatabase('postgresql://user:secret@example.neon.tech/tra')).toThrow(
-      /DEV-only/,
-    );
   });
 });
