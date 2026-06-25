@@ -1,17 +1,73 @@
 <!doctype html>
-<html lang="en">
+<html lang="sq">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="description" content="Radari Vendor is launching in 2026." />
-    <title>Radari Vendor</title>
+    <meta
+      name="description"
+      content="Regjistër publik i dokumenteve të bashkive shqiptare — vendime, konsultime dhe prokurime, të mbledhura dhe të provueshme se nuk janë ndryshuar."
+    />
+    <title>Radar Transparence — Regjistër publik</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <main>
-      <p>Transparency Radar Albania</p>
-      <h1>Radari Vendor</h1>
-      <h2>Launching in 2026.</h2>
-    </main>
+    <div class="page">
+      <header class="masthead">
+        <div class="kicker">Regjistër publik i dokumenteve</div>
+        <h1>Radar Transparence</h1>
+        <p class="lede">
+          Dokumentet e bashkive shqiptare — të mbledhura, të kërkueshme dhe të provueshme se nuk
+          janë ndryshuar.
+        </p>
+        <div class="meta-line">CSDG ALBANIA · 5 BASHKI</div>
+      </header>
+
+      <div class="divider"></div>
+
+      <nav class="tabs" id="tabs" aria-label="Lloji i dokumentit"></nav>
+
+      <section class="filters">
+        <div class="filter-block">
+          <div class="filter-label">Bashkia</div>
+          <div class="chips" id="municipality-chips"></div>
+        </div>
+
+        <div class="filter-row">
+          <div class="filter-block grow">
+            <label class="filter-label" for="year-select">Viti</label>
+            <select id="year-select">
+              <option value="">Të gjitha vitet</option>
+            </select>
+          </div>
+          <div class="filter-block grow">
+            <label class="filter-label" for="search-input">Kërko</label>
+            <input
+              type="search"
+              id="search-input"
+              placeholder="Kërko në titull…"
+              autocomplete="off"
+            />
+          </div>
+        </div>
+      </section>
+
+      <div class="results-meta" id="results-meta" role="status" aria-live="polite"></div>
+
+      <section class="results" id="results" aria-live="polite"></section>
+
+      <nav class="pagination" id="pagination" aria-label="Faqosja"></nav>
+
+      <footer class="site-footer">
+        <p>Një projekt qytetar nga CSDG Albania.</p>
+      </footer>
+    </div>
+
+    <script src="/app.js"></script>
   </body>
 </html>
