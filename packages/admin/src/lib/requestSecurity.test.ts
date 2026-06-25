@@ -28,9 +28,9 @@ describe('Astro BFF POST origin validation', () => {
       isAllowedPostOrigin(
         new Request('http://localhost:8080/api/login', {
           headers: {
-            Host: 'admin.radarivendor.com',
-            Origin: 'https://admin.radarivendor.com',
-            'X-Forwarded-Host': 'admin.radarivendor.com',
+            Host: 'admin.radarvendor.com',
+            Origin: 'https://admin.radarvendor.com',
+            'X-Forwarded-Host': 'admin.radarvendor.com',
             'X-Forwarded-Proto': 'https',
           },
         }),
@@ -40,9 +40,9 @@ describe('Astro BFF POST origin validation', () => {
 
   it('rejects spoofed forwarded protocol, host, or origin values', () => {
     const headers = {
-      Host: 'admin.radarivendor.com',
-      Origin: 'https://admin.radarivendor.com',
-      'X-Forwarded-Host': 'admin.radarivendor.com',
+      Host: 'admin.radarvendor.com',
+      Origin: 'https://admin.radarvendor.com',
+      'X-Forwarded-Host': 'admin.radarvendor.com',
       'X-Forwarded-Proto': 'https',
     };
 

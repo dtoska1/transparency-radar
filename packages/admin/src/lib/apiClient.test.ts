@@ -39,9 +39,9 @@ describe('admin BFF API client', () => {
     expect(
       getAdminApiBaseUrl({
         NODE_ENV: 'production',
-        ADMIN_API_BASE_URL: 'https://api.radarivendor.com',
+        ADMIN_API_BASE_URL: 'https://api.radarvendor.com',
       }).href,
-    ).toBe('https://api.radarivendor.com/');
+    ).toBe('https://api.radarvendor.com/');
   });
 
   it('forwards only the session cookie and explicitly requested content type', async () => {
